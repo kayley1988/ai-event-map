@@ -22,6 +22,7 @@
   <nav class="tabs" role="tablist">
     <button class="tab is-active" data-view="map" role="tab">全国地图</button>
     <button class="tab" data-view="calendar" role="tab">倒排日历</button>
+    <button class="tab" data-view="articles" role="tab">AI 资讯</button>
     <button class="tab" data-view="watching" role="tab">我的关注 <span class="tab-badge" id="watchBadge" hidden>0</span></button>
   </nav>
   <div class="topbar-right">
@@ -162,6 +163,16 @@
     </div>
   </div>
   <div class="watch-grid" id="watchGrid"></div>
+</main>
+
+<!-- ============ AI 资讯视图 ============ -->
+<main class="view" id="view-articles">
+  <div class="articles-head">
+    <h1>AI 资讯</h1>
+    <p class="map-sub">Agent 经济与 AI 生态的一线文章 · 黑客松主办方动态 + 技术媒体 · 每日自动更新</p>
+    <div class="art-filters" id="artFilters"></div>
+  </div>
+  <div class="articles-list" id="articlesList"></div>
 </main>
 
 <!-- ============ 活动详情弹窗 ============ -->

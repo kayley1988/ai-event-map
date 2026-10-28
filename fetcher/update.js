@@ -125,6 +125,9 @@ function main() {
   // 3. 聚合站
   run(path.join(__dirname, 'competition-radar.js'));
 
+  // 3.5 AI 资讯文章流（ClawHunt 官方文章 + RSS 媒体）
+  run(path.join(__dirname, 'collect-articles.js'));
+
   // 4. 快照
   buildSnapshot();
   console.log('\n════ 更新完成 ════');

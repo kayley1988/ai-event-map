@@ -1546,3 +1546,117 @@ a { color: inherit; }
   box-shadow: none;
 }
 .cal-mode .chip + .chip { border-left: 2px solid var(--ink); }
+
+/* ============ AI 资讯（文章流） ============ */
+
+.articles-head {
+  padding: 26px 30px 16px;
+  border-bottom: 2px solid var(--ink);
+  background: var(--card);
+}
+.articles-head h1 {
+  margin: 0;
+  font-size: 34px;
+  font-weight: 900;
+  letter-spacing: -2px;
+}
+.art-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.articles-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px 30px 44px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 980px;
+}
+
+.art-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px 18px;
+  background: var(--card);
+  border: 2px solid var(--ink);
+  border-radius: var(--r-md, 10px);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: .14s;
+}
+.art-row:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 4px 4px 0 var(--ink);
+}
+.art-num {
+  flex: none;
+  font-size: 20px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent-deep);
+  min-width: 30px;
+  line-height: 1.2;
+}
+.art-thumb {
+  flex: none;
+  width: 108px;
+  height: 72px;
+  object-fit: cover;
+  border: 1.5px solid var(--ink);
+  border-radius: 6px;
+  background: var(--paper-2, #f6f6f2);
+}
+.art-main { flex: 1; min-width: 0; }
+.art-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--ink-3);
+}
+.badge-art {
+  background: var(--accent);
+  color: var(--ink);
+  font-size: 11px;
+}
+.art-src { color: var(--ink-2); }
+.art-title {
+  margin: 6px 0 4px;
+  font-size: 16.5px;
+  font-weight: 900;
+  letter-spacing: -.3px;
+  line-height: 1.4;
+}
+.art-row:hover .art-title { text-decoration: underline; text-underline-offset: 3px; }
+.art-excerpt {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--ink-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.art-go {
+  flex: none;
+  align-self: center;
+  font-size: 18px;
+  color: var(--ink-3);
+  transition: .14s;
+}
+.art-row:hover .art-go { color: var(--ink); transform: translate(2px, -2px); }
+
+@media (max-width: 720px) {
+  .art-thumb { display: none; }
+  .art-num { display: none; }
+  .articles-list { padding: 14px 14px 30px; }
+}

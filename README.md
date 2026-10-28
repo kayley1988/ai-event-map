@@ -19,6 +19,7 @@ site/
 │   └── app.js              # 应用逻辑
 ├── data/
 │   ├── events.json         # ★ 活动数据（定时任务更新此文件）
+│   ├── articles.json       # AI 资讯文章流（资讯页数据）
 │   ├── seed-events.json    # 种子数据（人工维护的高质量活动）
 │   ├── map-paths.js        # 地图路径（自动生成）
 │   ├── china_100000_full.json  # 标准国界源数据
@@ -28,6 +29,8 @@ site/
     ├── fetch.js            # HTTP 管线：必应/搜狗微信/RSS
     ├── browser-fetch.js    # 浏览器管线：活动行/B站/小红书/抖音
     ├── competition-radar.js# 聚合站：AI Competition Radar
+    ├── collect-articles.js # AI 资讯文章流（ClawHunt 官方文章 + RSS 媒体）
+    ├── detail-browser.js   # 浏览器补正文（详情页全文回源）
     ├── merge-browser.js    # 浏览器结果 → 结构化活动
     ├── parsers.js          # 字段识别规则（共用）
     ├── sources.js          # 数据源配置

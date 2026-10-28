@@ -63,6 +63,8 @@
     watched: loadLocal('watched', []),
     customs: loadLocal('customs', []),
     filterText: '',
+    articles: [],
+    artFilter: '',
   };
 
   /* ---------------- 本地存储 ---------------- */
@@ -185,7 +187,78 @@
     renderMap();
     renderCalendar();
     renderWatch();
+    renderArticles();
     updateBadge();
+    loadArticles();
+  }
+
+  /* ---------------- AI 资讯 ---------------- */
+
+  async function loadArticles() {
+    try {
+      const r = await fetch('data/articles.json?t=' + Date.now());
+      if (r.ok) {
+        const db = await r.json();
+        state.articles = db.articles || [];
+        renderArticles();
+      }
+    } catch (e) { /* 静默失败，资讯页显示空态 */ }
+  }
+
+  function renderArticles() {
+    const listEl = $('#articlesList');
+    if (!listEl) return;
+    const articles = state.articles || [];
+    const filtersEl = $('#artFilters');
+
+    // 来源筛选 chips（来源集合变化时重建）
+    const sources = ['全部', ...new Set(articles.map((a) => a.source))];
+    const sig = sources.join('|');
+    if (filtersEl && filtersEl.dataset.sig !== sig) {
+      filtersEl.innerHTML = sources.map((s) =>
+        `<button class="chip${s === (state.artFilter || '全部') ? ' is-active' : ''}" data-asrc="${esc(s)}">${esc(s)}</button>`).join('');
+      filtersEl.dataset.sig = sig;
+      $$('#artFilters .chip').forEach((c) => {
+        c.addEventListener('click', () => {
+          $$('#artFilters .chip').forEach((x) => x.classList.remove('is-active'));
+          c.classList.add('is-active');
+          state.artFilter = c.dataset.asrc;
+          renderArticles();
+        });
+      });
+    }
+
+    const shown = articles.filter((a) => !state.artFilter || state.artFilter === '全部' || a.source === state.artFilter);
+
+    if (!shown.length) {
+      listEl.innerHTML = `<div class="empty">
+        <div class="empty-emoji">📰</div>
+        <p>资讯加载中或暂无文章</p>
+        <small>数据每日自动更新</small>
+      </div>`;
+      return;
+    }
+
+    listEl.innerHTML = shown.map((a, i) => `
+      <article class="art-row${a.image ? ' has-img' : ''}" data-url="${esc(a.url)}">
+        <span class="art-num">${String(i + 1).padStart(2, '0')}</span>
+        ${a.image ? `<img class="art-thumb" src="${esc(a.image)}" alt="" loading="lazy">` : ''}
+        <div class="art-main">
+          <div class="art-meta">
+            <span class="badge badge-art">${esc(a.category)}</span>
+            <span class="art-src">${esc(a.source)}</span>
+            ${a.minutes ? `<span>约 ${a.minutes} 分钟</span>` : ''}
+            ${a.date ? `<span>${esc(a.date)}</span>` : ''}
+          </div>
+          <h3 class="art-title">${highlightTitle(a.title)}</h3>
+          ${a.excerpt ? `<p class="art-excerpt">${esc(a.excerpt)}</p>` : ''}
+        </div>
+        <span class="art-go">↗</span>
+      </article>`).join('');
+
+    $$('#articlesList .art-row').forEach((row) => {
+      row.addEventListener('click', () => window.open(row.dataset.url, '_blank', 'noopener'));
+    });
   }
 
   function renderSyncStatus() {

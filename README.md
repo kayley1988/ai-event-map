@@ -120,5 +120,24 @@ node fetcher/browser-fetch.js --platform xhs --login
 
 ## 定时任务
 
-已配置 WorkBuddy 定时任务「AI 活动数据每日抓取」，每天 09:00 自动执行
-`fetcher/update.js --refresh` 并更新 `data/events.json`。
+两条链路并行，互为备份：
+
+**1. GitHub Actions（推荐，无需开机）**
+
+`.github/workflows/update-and-deploy.yml`，每天北京时间 09:01
+（UTC `cron: '1 1 * * *'`）自动执行：
+
+```
+npm install playwright → node fetcher/update.js --skip xhs,douyin
+  → git commit data/events.json → 打包 dist → 部署 GitHub Pages
+```
+
+CI 环境没有登录态，所以跳过小红书/抖音；活动行、B站、必应、搜狗微信、
+RSS、赛事雷达全部照跑。任何触发方式（定时/手动/push）都会走部署。
+
+部署步骤见 `deploy/GitHub-Actions.md`。
+
+**2. WorkBuddy 定时任务（本机）**
+
+「AI 活动数据每日抓取」，每天 09:00 执行 `fetcher/update.js --refresh`，
+带本机浏览器登录态，可抓小红书/抖音，用于补充 CI 拿不到的数据。

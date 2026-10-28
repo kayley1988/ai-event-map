@@ -80,6 +80,8 @@ jobs:
           mkdir -p dist
           cp -r index.html assets data dist/
           rm -rf dist/data/.cache dist/data/auth dist/data/browser-out
+          # 只在本地生成地图时需要，线上不用，省 580KB
+          rm -f dist/data/china_100000_full.json
           # 种子数据仅在 events.json 缺失时兜底，线上不需要
           rm -f dist/data/seed-events.json
           du -sh dist

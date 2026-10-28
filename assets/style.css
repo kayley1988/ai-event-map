@@ -1722,7 +1722,7 @@ a { color: inherit; }
 
 /* =========================================================
  * 赛博朋克主题覆写层（Cyberpunk Override）
- * 深空蓝黑底 + 霓虹青主色 + 品红/紫/绿点缀 + 网格纹理
+ * 深空蓝黑底 + 霓虹紫主色 + 金黄强调 + 品红/紫/绿点缀 + 网格纹理
  * 只覆盖变量与个别亮底组件，全部规则在此层之后生效
  * ======================================================= */
 
@@ -1738,18 +1738,19 @@ a { color: inherit; }
   --line: #1d2742;
   --line-2: #2c3a63;
 
-  --accent: #00ffd0;         /* 霓虹青 */
-  --accent-deep: #00c3a0;
-  --hot: #ff2d78;            /* 黑客松：霓虹品红 */
+  --accent: #b06bff;         /* 主色：霓虹紫 */
+  --accent-deep: #7c3aed;
+  --gold: #ffd23f;           /* 强调色：金黄 */
+  --hot: #ffd23f;            /* 黑客松：金黄 */
   --conf: #38b6ff;           /* 大会：电光蓝 */
-  --salon: #b06bff;          /* 沙龙：赛博紫 */
+  --salon: #e879f9;          /* 沙龙：赛博紫 */
   --meet: #00e59b;           /* 聚会：荧光绿 */
   --ok: #00e59b;
   --warn: #ffb020;
 
-  --shadow-sm: 3px 3px 0 rgba(0, 255, 208, .22);
-  --shadow: 4px 4px 0 rgba(0, 255, 208, .12);
-  --shadow-lg: 8px 8px 0 rgba(0, 255, 208, .10);
+  --shadow-sm: 3px 3px 0 rgba(176, 107, 255, .22);
+  --shadow: 4px 4px 0 rgba(176, 107, 255, .12);
+  --shadow-lg: 8px 8px 0 rgba(176, 107, 255, .10);
 }
 
 /* 全局：深空底 + 霓虹网格纹理（替代纸纹） */
@@ -1757,57 +1758,56 @@ body { background: var(--paper); }
 body::before {
   opacity: 1;
   background-image:
-    linear-gradient(rgba(0, 255, 208, .045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 255, 208, .045) 1px, transparent 1px),
-    radial-gradient(ellipse 90% 60% at 50% -10%, rgba(56, 182, 255, .08), transparent);
+    linear-gradient(rgba(176, 107, 255, .045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(176, 107, 255, .045) 1px, transparent 1px),
+    radial-gradient(ellipse 90% 60% at 50% -10%, rgba(176, 107, 255, .10), transparent);
   background-size: 44px 44px, 44px 44px, 100% 100%;
 }
 
 /* 亮底组件改暗面板（原 var(--ink) 底 + 白字 会翻车） */
 .brand-mark { background: var(--accent); color: #051018; }
 .city-item.is-active {
-  background: rgba(0, 255, 208, .10);
+  background: rgba(176, 107, 255, .10);
   color: var(--accent);
   box-shadow: inset 3px 0 0 var(--accent);
 }
 .map-tooltip {
   background: #0b1322;
   border: 2px solid var(--accent);
-  box-shadow: 0 0 18px rgba(0, 255, 208, .25);
+  box-shadow: 0 0 18px rgba(176, 107, 255, .25);
   color: var(--ink);
 }
 .hero-count {
   background: #0b1322;
   border: 2px solid var(--accent);
   color: var(--accent);
-  box-shadow: 0 0 16px rgba(0, 255, 208, .2);
+  box-shadow: 0 0 16px rgba(176, 107, 255, .2);
 }
 .hero-count span { color: rgba(230, 241, 255, .62); }
 .city-summary-band { background: #0b1322; color: var(--ink); }
 .city-summary-band .fact-row .v,
 .city-summary-band h3 { color: var(--ink); }
 .ev-date {
-  background: rgba(0, 255, 208, .12);
+  background: rgba(176, 107, 255, .12);
   color: var(--accent);
 }
 
 /* 徽章配色 */
-.badge-hackathon { background: rgba(255, 45, 120, .16); color: #ff5c95; }
+.badge-hackathon { background: rgba(255, 210, 63, .16); color: #ffd23f; }
 .badge-conference { background: rgba(56, 182, 255, .14); color: #5cc8ff; }
-.badge-salon { background: rgba(176, 107, 255, .15); color: #c58cff; }
+.badge-salon { background: rgba(176, 107, 255, .15); color: #f0abfc; }
 .badge-meetup { background: rgba(0, 229, 155, .13); color: #22e8a8; }
-.badge-online { background: var(--accent); color: #051018; }
-.badge-rec { background: var(--accent); color: #051018; }
+.badge-online { background: var(--gold); color: #1a1205; }
+.badge-rec { background: var(--gold); color: #1a1205; }
 
 /* 日历 */
-.cal-cell.is-today { background: rgba(0, 255, 208, .08); }
+.cal-cell.is-today { background: rgba(176, 107, 255, .08); }
 .cal-cell.is-today .cal-day { color: var(--accent); }
-.cal-today-tag { background: var(--accent); color: #051018; }
-.cal-ev.t-hackathon { border-left-color: var(--hot); background: rgba(255, 45, 120, .08); }
+.cal-today-tag { background: var(--gold); color: #1a1205; }
+.cal-ev.t-hackathon { border-left-color: var(--hot); background: rgba(255, 210, 63, .08); }
 .cal-ev.t-conference { border-left-color: var(--conf); background: rgba(56, 182, 255, .07); }
-.cal-ev.t-salon { border-left-color: var(--salon); background: rgba(176, 107, 255, .08); }
-.cal-ev.t-meetup { border-left-color: var(--meet); background: rgba(0, 229, 155, .07); }
-.cal-ev:hover { box-shadow: 2px 2px 0 rgba(0, 255, 208, .4); }
+.cal-ev.t-salon { border-left-color: var(--salon); background: rgba(232, 121, 249, .08); }
+.cal-ev:hover { box-shadow: 2px 2px 0 rgba(176, 107, 255, .4); }
 
 /* 地图 */
 .province { fill: #131c33; stroke: #26345c; }
@@ -1815,22 +1815,25 @@ body::before {
 .province:hover { fill: var(--accent); stroke: #051018; }
 .south-sea { fill: #101a30; }
 .inset-label { fill: var(--ink-3); }
-.site-stats { background: rgba(0, 255, 208, .12); color: var(--accent); }
+.site-stats { background: rgba(255, 210, 63, .13); color: var(--gold); }
 .site-stats .ss-muted { color: var(--ink-2); opacity: 1; }
 
 /* 卡片霓虹描边 */
-.ev-card:hover, .art-row:hover { box-shadow: 4px 4px 0 rgba(0, 255, 208, .35); }
+.ev-card:hover, .art-row:hover { box-shadow: 4px 4px 0 rgba(176, 107, 255, .35); }
 .card-link { background: var(--accent); color: #051018; }
 .hero-toggle { background: var(--accent); color: #051018; }
-.hero-tagline { transform: rotate(-1deg); box-shadow: 0 0 14px rgba(0, 255, 208, .3); }
+.hero-tagline { transform: rotate(-1deg); box-shadow: 0 0 14px rgba(176, 107, 255, .3); }
 
 /* 地图城市标签：白描边改深色描边（暗底上白晕太扎眼） */
 .marker-label { stroke: rgba(7, 11, 20, .92); }
 
-/* 关键词高亮：默认黄底改霓虹青 */
+/* 关键词高亮：金黄底深字（赛博朋克经典黄） */
 mark {
-  background: rgba(0, 255, 208, .22);
-  color: var(--accent);
+  background: rgba(255, 210, 63, .85);
+  color: #1a1205;
   padding: 0 2px;
   border-radius: 2px;
 }
+
+/* 资讯列表填满视口，消除宽屏右侧空白 */
+.articles-list { max-width: none; }

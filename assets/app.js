@@ -17,10 +17,10 @@
     meetup: '社区聚会',
   };
   const TYPE_COLOR = {
-    hackathon: '#ff5a3c',
-    conference: '#2563eb',
-    salon: '#7c3aed',
-    meetup: '#0891b2',
+    hackathon: '#ffd23f',
+    conference: '#38b6ff',
+    salon: '#e879f9',
+    meetup: '#2dd4bf',
   };
   const WEEKDAY = ['日', '一', '二', '三', '四', '五', '六'];
 

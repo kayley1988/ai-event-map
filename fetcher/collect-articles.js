@@ -20,6 +20,33 @@ const OUT = path.join(ROOT, 'data', 'articles.json');
 const CLAWHUNT_URL = 'https://clawhunt.store/zh/articles';
 const CLAWHUNT_BASE = 'https://clawhunt.store';
 
+/* 仅用于资讯流的文章源（不进活动抓取管线） */
+const ARTICLE_RSS = [
+  { name: '量子位', url: 'https://www.qbitai.com/feed' },
+  { name: '爱范儿', url: 'https://www.ifanr.com/feed' },
+  // 36氪 /feed 返回反爬挑战页，暂不可用
+];
+
+/* Hacker News 官方 Algolia 搜索 API：开源免费无需 key */
+const HN_API = 'https://hn.algolia.com/api/v1/search_by_date?query=AI&tags=story&hitsPerPage=25&numericFilters=points%3E1';
+
+async function parseHN() {
+  const d = JSON.parse(await httpGet(HN_API));
+  return (d.hits || [])
+    .filter((h) => h.title)
+    .map((h) => ({
+      id: `hn-${h.objectID}`,
+      title: h.title,
+      excerpt: h.story_text ? stripTags(h.story_text).slice(0, 160) : '',
+      url: h.url || `https://news.ycombinator.com/item?id=${h.objectID}`,
+      source: 'Hacker News',
+      category: 'AI 前沿',
+      date: (h.created_at || '').slice(0, 10),
+      minutes: null,
+      image: '',
+    }));
+}
+
 const CLAWHUNT_CATEGORY = {
   Community: '社区', Product: '产品', Research: '研究', Guide: '指南',
   Security: '安全', Platform: '平台', Discovery: '发现', System: '系统',
@@ -134,8 +161,15 @@ function parseRss(xml, sourceName) {
 
 async function main() {
   console.log('▶ 采集 AI 资讯文章…');
-  const jobs = [{ name: 'ClawHunt', run: async () => parseClawhunt(await httpGet(CLAWHUNT_URL)) }]
+  const jobs = [
+      { name: 'ClawHunt', run: async () => parseClawhunt(await httpGet(CLAWHUNT_URL)) },
+      { name: 'Hacker News', run: parseHN },
+    ]
     .concat(SOURCES.filter((s) => s.type === 'rss').map((s) => ({
+      name: s.name,
+      run: async () => parseRss(await httpGet(s.url), s.name),
+    })))
+    .concat(ARTICLE_RSS.map((s) => ({
       name: s.name,
       run: async () => parseRss(await httpGet(s.url), s.name),
     })));
@@ -160,7 +194,7 @@ async function main() {
     return true;
   });
   uniq.sort((a, b) => String(b.date).localeCompare(String(a.date)));
-  const articles = uniq.slice(0, 60);
+  const articles = uniq.slice(0, 120);
 
   fs.writeFileSync(OUT, JSON.stringify({
     updatedAt: new Date().toISOString(),

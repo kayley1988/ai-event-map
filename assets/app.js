@@ -17,10 +17,10 @@
     meetup: '社区聚会',
   };
   const TYPE_COLOR = {
-    hackathon: '#ffd23f',
-    conference: '#38b6ff',
-    salon: '#e879f9',
-    meetup: '#2dd4bf',
+    hackathon: '#ff5a3c',
+    conference: '#2563eb',
+    salon: '#7c3aed',
+    meetup: '#0891b2',
   };
   const WEEKDAY = ['日', '一', '二', '三', '四', '五', '六'];
 
@@ -432,7 +432,7 @@
       mapState.gSea.innerHTML = `
         <g class="inset-group">
           <rect x="${ins.x - 6}" y="${ins.y - 6}" width="${ins.w + 12}" height="${ins.h + 12}"
-                fill="#0b1322" stroke="#2c3a63" stroke-width="0.8" rx="4"></rect>
+                fill="#fbfbf7" stroke="#d5d0c2" stroke-width="0.8" rx="4"></rect>
           ${insPaths}
           ${ins.southSea ? `<path class="south-sea" d="${ins.southSea}"></path>` : ''}
           <text x="${ins.x + ins.w / 2}" y="${ins.y + ins.h + 2}" class="inset-label"
@@ -504,7 +504,7 @@
       return `
         <g class="marker" data-city="${esc(c)}" transform="translate(${x.toFixed(1)},${y.toFixed(1)})">
           ${isHot ? `<circle class="halo" r="${r}" fill="url(#markerGlow)"></circle>` : ''}
-          <circle class="pin" r="${r}" fill="${color}" stroke="#070b14" stroke-width="2"></circle>
+          <circle class="pin" r="${r}" fill="${color}" stroke="#fff" stroke-width="2"></circle>
           ${n > 1 ? `<text class="marker-count" x="0" y="3.6" text-anchor="middle">${n}</text>` : ''}
           <text class="marker-label" x="0" y="${labelY.toFixed(1)}" text-anchor="middle">${esc(c)}</text>
         </g>`;

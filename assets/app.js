@@ -430,6 +430,9 @@
     $('#cityTagline').textContent = city === '线上' ? '线上 / 全球赛事' : `${city} AI 活动地图`;
     $('#cityCount').innerHTML = `<b>${list.length}</b><span>场进行中/即将开始</span>`;
     $('#cityHero').dataset.count = list.length;
+    // 折叠状态下的细条内容
+    $('#heroMiniName').textContent = city;
+    $('#heroMiniSub').textContent = `${list.length} 场即将开始 · 共 ${all.length} 场收录`;
     $('#cityStats').innerHTML = `
       <div class="hero-stat"><b>${all.length}</b><span>活动总数</span></div>
       <div class="hero-stat"><b>${upcoming.length}</b><span>即将开始</span></div>
@@ -584,10 +587,22 @@
         <div class="ev-foot">
           <span class="badge badge-${e.type}">${TYPE_NAME[e.type] || ''}</span>
           <span class="countdown-mini${cls}">${esc(cd)}</span>
-          ${e.url ? `<a class="icon-btn" href="${esc(e.url)}" target="_blank" rel="noopener" title="原文">↗</a>` : ''}
+          ${cardLink(e)}
           <button class="icon-btn ${isWatched(e.id) ? 'is-on' : ''}" data-watch="${esc(e.id)}" title="关注">${isWatched(e.id) ? '★' : '☆'}</button>
         </div>
       </article>`;
+  }
+
+  /**
+   * 卡片右下角的操作链接。
+   * 有原文链接 → 直接跳转；没有 → 用标题去必应搜索，保证每张卡都有可点的出口。
+   */
+  function cardLink(e) {
+    if (e.url) {
+      return `<a class="card-link" href="${esc(e.url)}" target="_blank" rel="noopener" title="${esc(e.title)}">报名/原文 ↗</a>`;
+    }
+    const q = encodeURIComponent(`${e.title} ${e.city} 报名`);
+    return `<a class="card-link is-search" href="https://www.bing.com/search?q=${q}" target="_blank" rel="noopener" title="网上搜索该活动">搜索详情 ↗</a>`;
   }
 
   /** 标题里的关键词高亮 */
@@ -619,7 +634,8 @@
   function bindCards() {
     $$('#cityEvents .ev-card').forEach((card) => {
       card.addEventListener('click', (e) => {
-        if (e.target.closest('[data-watch]')) return;
+        // 链接和关注按钮不触发详情弹窗
+        if (e.target.closest('[data-watch]') || e.target.closest('a.card-link')) return;
         openModal(card.dataset.id);
       });
     });
@@ -673,7 +689,9 @@
           <ul>${e.highlights.map((h) => `<li>${esc(h)}</li>`).join('')}</ul>
         </div>` : ''}
       <div class="dt-actions">
-        ${e.url ? `<a class="btn btn-primary" href="${esc(e.url)}" target="_blank" rel="noopener">查看原文 ↗</a>` : ''}
+        ${e.url
+          ? `<a class="btn btn-primary" href="${esc(e.url)}" target="_blank" rel="noopener">报名/查看原文 ↗</a>`
+          : `<a class="btn btn-primary" href="https://www.bing.com/search?q=${encodeURIComponent(`${e.title} ${e.city} 报名`)}" target="_blank" rel="noopener">搜索报名方式 ↗</a>`}
         <button class="btn" data-modal-watch="${esc(e.id)}">${isWatched(e.id) ? '★ 取消关注' : '☆ 关注此活动'}</button>
       </div>
       ${e.sourceUrl && e.sourceUrl !== e.url ? `<div class="dt-source">原文：<a href="${esc(e.sourceUrl)}" target="_blank" rel="noopener">${esc(e.sourceUrl.slice(0, 60))}</a></div>` : ''}
@@ -881,6 +899,21 @@
     });
 
     $('#cityBack').addEventListener('click', () => switchView('map'));
+
+    // 头部海报区折叠/展开（默认收起，记住用户选择）
+    const applyHeroState = () => {
+      const collapsed = localStorage.getItem('heroCollapsed') !== '0';
+      $('#cityHero').classList.toggle('is-collapsed', collapsed);
+      const btn = $('#heroToggle');
+      btn.textContent = collapsed ? '展开头部 ▼' : '收起头部 ▲';
+      btn.setAttribute('aria-expanded', String(!collapsed));
+    };
+    applyHeroState();
+    $('#heroToggle').addEventListener('click', () => {
+      const next = $('#cityHero').classList.contains('is-collapsed') ? '0' : '1';
+      localStorage.setItem('heroCollapsed', next);
+      applyHeroState();
+    });
 
     $('#cityFilter').addEventListener('input', (e) => {
       state.filterText = e.target.value;

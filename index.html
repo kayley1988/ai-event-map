@@ -90,7 +90,14 @@
 <!-- ============ 城市详情视图 ============ -->
 <main class="view" id="view-city">
   <div class="city-hero" id="cityHero">
-    <button class="back-btn" id="cityBack">← 返回全国地图</button>
+    <div class="hero-toolbar">
+      <button class="back-btn" id="cityBack">← 返回全国地图</button>
+      <button class="hero-toggle" id="heroToggle" aria-expanded="true">收起头部 ▲</button>
+    </div>
+    <div class="hero-mini" id="heroMini">
+      <span class="hero-mini-name" id="heroMiniName">北京</span>
+      <span class="hero-mini-sub" id="heroMiniSub">7 场即将开始 · 点右侧展开详情</span>
+    </div>
     <div class="hero-grid">
       <div class="hero-main">
         <h1 id="cityName">上海</h1>

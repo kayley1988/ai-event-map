@@ -751,6 +751,87 @@ a { color: inherit; }
   gap: 9px;
 }
 
+/* 卡片上的活动链接：有原文 → 强调色；没有 → 搜索兜底 */
+.card-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border: 2px solid var(--ink);
+  border-radius: var(--r-sm);
+  background: var(--accent);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: .14s;
+}
+.card-link:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: var(--shadow-sm);
+}
+.card-link.is-search {
+  background: var(--card);
+  color: var(--ink-2);
+  border-color: var(--line-2);
+}
+.card-link.is-search:hover { border-color: var(--ink); color: var(--ink); }
+
+/* ---------- 城市页头部折叠 ---------- */
+.hero-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  position: relative;
+  z-index: 2;
+}
+.hero-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: 2px solid var(--ink);
+  border-radius: var(--r-sm);
+  background: var(--accent);
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--ink);
+  cursor: pointer;
+  transition: .14s;
+}
+.hero-toggle:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: var(--shadow-sm);
+}
+
+/* 折叠后的细条（默认隐藏，is-collapsed 时显示） */
+.hero-mini {
+  display: none;
+  align-items: baseline;
+  gap: 12px;
+  margin-top: 12px;
+  position: relative;
+  z-index: 2;
+}
+.hero-mini-name {
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -1px;
+  line-height: 1;
+}
+.hero-mini-sub {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink-3);
+}
+
+.city-hero.is-collapsed { padding-bottom: 14px; }
+.city-hero.is-collapsed .hero-grid { display: none; }
+.city-hero.is-collapsed::after { font-size: 72px; top: -6px; opacity: .18; }
+.city-hero.is-collapsed .hero-mini { display: flex; }
+
 .badge {
   display: inline-flex;
   align-items: center;

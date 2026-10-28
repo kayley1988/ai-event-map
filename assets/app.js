@@ -65,6 +65,7 @@
     filterText: '',
     articles: [],
     artFilter: '',
+    artCat: '',
   };
 
   /* ---------------- 本地存储 ---------------- */
@@ -188,8 +189,25 @@
     renderCalendar();
     renderWatch();
     renderArticles();
+    renderSiteStats();
     updateBadge();
     loadArticles();
+  }
+
+  /** 站点统计横幅（借鉴 ClawHunt 的数据展示区） */
+  function renderSiteStats() {
+    const el = $('#siteStats');
+    if (!el) return;
+    const evs = state.events || [];
+    const cities = new Set(evs.map((e) => e.city).filter(Boolean)).size;
+    const sources = new Set(evs.map((e) => e.source).filter(Boolean)).size;
+    const hacks = evs.filter((e) => e.type === 'hackathon').length;
+    el.innerHTML = `
+      <span class="ss-item"><b>${cities}</b> 座城市</span>
+      <span class="ss-item"><b>${evs.length}</b> 场活动</span>
+      <span class="ss-item"><b>${hacks}</b> 场黑客松</span>
+      <span class="ss-item"><b>${sources}</b> 个数据源</span>
+      <span class="ss-item ss-muted">每天 09:01 自动抓取更新</span>`;
   }
 
   /* ---------------- AI 资讯 ---------------- */
@@ -210,8 +228,9 @@
     if (!listEl) return;
     const articles = state.articles || [];
     const filtersEl = $('#artFilters');
+    const catsEl = $('#artCats');
 
-    // 来源筛选 chips（来源集合变化时重建）
+    // 来源 chips（来源集合变化时重建）
     const sources = ['全部', ...new Set(articles.map((a) => a.source))];
     const sig = sources.join('|');
     if (filtersEl && filtersEl.dataset.sig !== sig) {
@@ -228,7 +247,26 @@
       });
     }
 
-    const shown = articles.filter((a) => !state.artFilter || state.artFilter === '全部' || a.source === state.artFilter);
+    // 分类 chips（借鉴 ClawHunt 的主题标签体系）
+    const cats = ['全部', ...new Set(articles.map((a) => a.category).filter(Boolean))];
+    const catSig = cats.join('|');
+    if (catsEl && catsEl.dataset.sig !== catSig) {
+      catsEl.innerHTML = cats.map((c2) =>
+        `<button class="chip${c2 === (state.artCat || '全部') ? ' is-active' : ''}" data-acat="${esc(c2)}">${esc(c2)}</button>`).join('');
+      catsEl.dataset.sig = catSig;
+      $$('#artCats .chip').forEach((c2) => {
+        c2.addEventListener('click', () => {
+          $$('#artCats .chip').forEach((x) => x.classList.remove('is-active'));
+          c2.classList.add('is-active');
+          state.artCat = c2.dataset.acat;
+          renderArticles();
+        });
+      });
+    }
+
+    const shown = articles.filter((a) =>
+      (!state.artFilter || state.artFilter === '全部' || a.source === state.artFilter) &&
+      (!state.artCat || state.artCat === '全部' || a.category === state.artCat));
 
     if (!shown.length) {
       listEl.innerHTML = `<div class="empty">
@@ -240,7 +278,7 @@
     }
 
     listEl.innerHTML = shown.map((a, i) => `
-      <article class="art-row${a.image ? ' has-img' : ''}" data-url="${esc(a.url)}">
+      <article class="art-row${a.image ? ' has-img' : ''}${a.content ? ' is-readable' : ''}" data-id="${esc(a.id)}">
         <span class="art-num">${String(i + 1).padStart(2, '0')}</span>
         ${a.image ? `<img class="art-thumb" src="${esc(a.image)}" alt="" loading="lazy">` : ''}
         <div class="art-main">
@@ -249,16 +287,46 @@
             <span class="art-src">${esc(a.source)}</span>
             ${a.minutes ? `<span>约 ${a.minutes} 分钟</span>` : ''}
             ${a.date ? `<span>${esc(a.date)}</span>` : ''}
+            ${a.content ? '<span class="art-readable">📖 站内可读</span>' : ''}
           </div>
           <h3 class="art-title">${highlightTitle(a.title)}</h3>
           ${a.excerpt ? `<p class="art-excerpt">${esc(a.excerpt)}</p>` : ''}
         </div>
-        <span class="art-go">↗</span>
+        <span class="art-go">${a.content ? '读' : '↗'}</span>
       </article>`).join('');
 
     $$('#articlesList .art-row').forEach((row) => {
-      row.addEventListener('click', () => window.open(row.dataset.url, '_blank', 'noopener'));
+      row.addEventListener('click', () => {
+        const a = shown.find((x) => x.id === row.dataset.id);
+        if (!a) return;
+        // 有全文 → 站内阅读器；没有 → 跳原文
+        if (a.content) openArticleReader(a);
+        else window.open(a.url, '_blank', 'noopener');
+      });
     });
+  }
+
+  /** 站内文章阅读器（借鉴 ClawHunt 文章页） */
+  function openArticleReader(a) {
+    const body = $('#articleBody');
+    const paras = String(a.content).split('\n').filter(Boolean)
+      .map((p) => `<p>${esc(p)}</p>`).join('');
+    body.innerHTML = `
+      <div class="rd-meta">
+        <span class="badge badge-art">${esc(a.category)}</span>
+        <span>${esc(a.source)}</span>
+        ${a.minutes ? `<span>约 ${a.minutes} 分钟</span>` : ''}
+        ${a.date ? `<span>${esc(a.date)}</span>` : ''}
+      </div>
+      <h2 class="rd-title">${esc(a.title)}</h2>
+      <div class="rd-content">${paras}</div>
+      <div class="dt-actions">
+        <a class="btn btn-primary" href="${esc(a.url)}" target="_blank" rel="noopener">查看原文 ↗</a>
+        <button class="btn" data-close>关闭</button>
+      </div>`;
+    $('#articleModal').hidden = false;
+    body.querySelector('[data-close]').addEventListener('click', closeModal);
+    body.scrollTop = 0;
   }
 
   function renderSyncStatus() {
@@ -787,6 +855,7 @@
   function closeModal() {
     $('#eventModal').hidden = true;
     $('#customModal').hidden = true;
+    $('#articleModal').hidden = true;
   }
 
   /* ---------------- 日历 ---------------- */

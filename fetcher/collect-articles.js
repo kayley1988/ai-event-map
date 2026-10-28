@@ -20,37 +20,11 @@ const OUT = path.join(ROOT, 'data', 'articles.json');
 const CLAWHUNT_URL = 'https://clawhunt.store/zh/articles';
 const CLAWHUNT_BASE = 'https://clawhunt.store';
 
-/* 仅用于资讯流的文章源（不进活动抓取管线） */
-const ARTICLE_RSS = [
-  { name: '量子位', url: 'https://www.qbitai.com/feed' },
-  { name: '爱范儿', url: 'https://www.ifanr.com/feed' },
-  // 36氪 /feed 返回反爬挑战页，暂不可用
-];
-
-/* Hacker News 官方 Algolia 搜索 API：开源免费无需 key */
-const HN_API = 'https://hn.algolia.com/api/v1/search_by_date?query=AI&tags=story&hitsPerPage=25&numericFilters=points%3E1';
-
-async function parseHN() {
-  const d = JSON.parse(await httpGet(HN_API));
-  return (d.hits || [])
-    .filter((h) => h.title)
-    .map((h) => ({
-      id: `hn-${h.objectID}`,
-      title: h.title,
-      excerpt: h.story_text ? stripTags(h.story_text).slice(0, 160) : '',
-      url: h.url || `https://news.ycombinator.com/item?id=${h.objectID}`,
-      source: 'Hacker News',
-      category: 'AI 前沿',
-      date: (h.created_at || '').slice(0, 10),
-      minutes: null,
-      image: '',
-    }));
-}
-
 const CLAWHUNT_CATEGORY = {
   Community: '社区', Product: '产品', Research: '研究', Guide: '指南',
-  Security: '安全', Platform: '平台', Discovery: '发现', System: '系统',
-  Incubation: '孵化', 'Delivery Evidence': '交付实证', Delivery: '交付实证',
+  Security: '安全', Safety: '安全', Platform: '平台', Discovery: '发现',
+  System: '系统', Incubation: '孵化', Delivery: '交付实证', Evidence: '交付实证',
+  'Delivery Evidence': '交付实证',
 };
 
 function httpGet(url, redirects = 3) {
@@ -89,6 +63,44 @@ function stripTags(html) {
 }
 
 /* ---------------- ClawHunt 官方文章 ---------------- */
+
+/** 提取文章详情页正文（article-prose 容器），保留段落换行 */
+function extractArticleBody(html) {
+  const i = html.indexOf('article-prose');
+  if (i < 0) return '';
+  let seg = html.slice(i);
+  const stop = seg.search(/<(footer|\/main)|class="article-grid"/);
+  if (stop > 0) seg = seg.slice(0, stop);
+  const inner = seg.match(/>([\s\S]*)/);
+  let t = (inner ? inner[1] : seg)
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|h1|h2|h3|h4|li|blockquote)>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/&#?\w+;/g, ' ')
+    .split('\n').map((l) => l.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n');
+  const tail = t.search(/(相关文章|相关阅读|上一篇|下一篇|阅读更多|© |Copyright)/);
+  if (tail > t.length * 0.4) t = t.slice(0, tail);
+  return t.slice(0, 4000).trim();
+}
+
+async function fetchClawhuntArticleBody(url, title) {
+  try {
+    const html = await httpGet(url);
+    let t = extractArticleBody(html);
+    if (!t) return '';
+    // 去掉混进正文开头的英文分类词与重复标题行
+    const titleCore = String(title || '').replace(/\s+/g, '').slice(0, 16);
+    t = t.split('\n').filter((l) => {
+      const line = l.trim();
+      if (/^(Community|Product|Research|Guide|Security|Platform|Discovery|System|Incubation|Delivery Evidence)$/i.test(line)) return false;
+      if (titleCore && line.replace(/\s+/g, '').startsWith(titleCore)) return false;
+      return true;
+    }).join('\n');
+    return t;
+  } catch (e) { return ''; }
+}
 
 function parseClawhunt(html) {
   const out = [];
@@ -161,15 +173,8 @@ function parseRss(xml, sourceName) {
 
 async function main() {
   console.log('▶ 采集 AI 资讯文章…');
-  const jobs = [
-      { name: 'ClawHunt', run: async () => parseClawhunt(await httpGet(CLAWHUNT_URL)) },
-      { name: 'Hacker News', run: parseHN },
-    ]
+  const jobs = [{ name: 'ClawHunt', run: async () => parseClawhunt(await httpGet(CLAWHUNT_URL)) }]
     .concat(SOURCES.filter((s) => s.type === 'rss').map((s) => ({
-      name: s.name,
-      run: async () => parseRss(await httpGet(s.url), s.name),
-    })))
-    .concat(ARTICLE_RSS.map((s) => ({
       name: s.name,
       run: async () => parseRss(await httpGet(s.url), s.name),
     })));
@@ -194,7 +199,24 @@ async function main() {
     return true;
   });
   uniq.sort((a, b) => String(b.date).localeCompare(String(a.date)));
-  const articles = uniq.slice(0, 120);
+  const articles = uniq.slice(0, 60);
+
+  // ClawHunt 文章静态可解析 → 直接抓全文存 content（站内阅读器用）
+  const clawhunt = articles.filter((a) => a.source === 'ClawHunt');
+  if (clawhunt.length) {
+    console.log(`  … 抓取 ${clawhunt.length} 篇 ClawHunt 文章全文`);
+    let done = 0;
+    const workers = Array.from({ length: 5 }, async () => {
+      while (clawhunt.length) {
+        const a = clawhunt.shift();
+        a.content = await fetchClawhuntArticleBody(a.url, a.title);
+        if (++done % 8 === 0) console.log(`    ${done} 篇完成`);
+      }
+    });
+    await Promise.all(workers);
+    const got = articles.filter((a) => a.source === 'ClawHunt' && a.content).length;
+    console.log(`  ✓ ClawHunt 全文 ${got}/${articles.filter((a) => a.source === 'ClawHunt').length} 篇`);
+  }
 
   fs.writeFileSync(OUT, JSON.stringify({
     updatedAt: new Date().toISOString(),

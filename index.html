@@ -65,6 +65,7 @@
             <span class="legend-item"><i class="lg lg-meet"></i>社区聚会</span>
           </div>
         </div>
+        <div class="site-stats" id="siteStats"></div>
       </div>
 
       <div class="map-wrap" id="mapWrap">
@@ -171,9 +172,19 @@
     <h1>AI 资讯</h1>
     <p class="map-sub">Agent 经济与 AI 生态的一线文章 · 黑客松主办方动态 + 技术媒体 · 每日自动更新</p>
     <div class="art-filters" id="artFilters"></div>
+    <div class="art-filters art-cats" id="artCats"></div>
   </div>
   <div class="articles-list" id="articlesList"></div>
 </main>
+
+<!-- ============ 文章阅读器弹窗 ============ -->
+<div class="modal" id="articleModal" hidden>
+  <div class="modal-backdrop" data-close></div>
+  <div class="modal-panel" role="dialog" aria-modal="true">
+    <button class="modal-close" data-close aria-label="关闭">×</button>
+    <div class="modal-body" id="articleBody"></div>
+  </div>
+</div>
 
 <!-- ============ 活动详情弹窗 ============ -->
 <div class="modal" id="eventModal" hidden>

@@ -1,0 +1,14 @@
+# 抓取缓存（每次运行重新生成）
+data/.cache/
+data/browser-out/
+data/auth/
+
+# 登录态等敏感文件（绝不入库）
+data/auth/*.json
+
+# 临时产物
+shots/
+*.log
+node_modules/
+dist/
+.DS_Store

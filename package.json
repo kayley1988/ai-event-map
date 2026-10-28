@@ -1,0 +1,17 @@
+{
+  "name": "ai-event-map",
+  "version": "1.0.0",
+  "private": true,
+  "description": "全国 AI 活动实时地图 —— 数据抓取管线与静态站点",
+  "scripts": {
+    "fetch": "node fetcher/update.js",
+    "fetch:http": "node fetcher/update.js --http-only",
+    "fetch:ci": "node fetcher/update.js --refresh --skip xhs,douyin"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "playwright": "^1.50.0"
+  }
+}

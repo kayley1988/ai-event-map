@@ -1,0 +1,97 @@
+name: 抓取数据并部署
+
+# 触发方式：
+#   1. 定时：每天北京时间 09:01 自动抓取 + 部署
+#   2. 手动：仓库 Actions 页面点 "Run workflow"
+#   3. push：只走部署，不重复抓取
+on:
+  schedule:
+    # GitHub Actions 的 cron 是 UTC。北京 09:01 = UTC 01:01
+    # 高峰时段（UTC 00:00）会延迟几分钟，所以错开整点
+    - cron: '1 1 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+# 同一时间只允许一个部署在跑，避免并发覆盖
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # 提交抓取结果
+  pages: write      # 部署到 GitHub Pages
+  id-token: write   # Pages 部署所需的 OIDC
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # ---------- 以下三步只在定时/手动触发时执行 ----------
+      - name: 缓存 Playwright 浏览器
+        if: github.event_name != 'push'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ hashFiles('package-lock.json', 'package.json') }}
+          restore-keys: pw-${{ runner.os }}-
+
+      - name: 安装依赖
+        if: github.event_name != 'push'
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: 抓取最新活动
+        if: github.event_name != 'push'
+        # 小红书/抖音需要扫码登录态，CI 里拿不到，跳过它们
+        run: node fetcher/update.js --skip xhs,douyin
+        continue-on-error: true
+
+      - name: 提交数据变更
+        if: github.event_name != 'push'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/events.json
+          if git diff --staged --quiet; then
+            echo "数据无变化，跳过提交"
+          else
+            git commit -m "chore(data): 更新活动数据 $(date -u +%F)"
+            git push
+          fi
+
+      # ---------- 以下为部署，任何触发方式都执行 ----------
+      - name: 打包静态站点
+        run: |
+          mkdir -p dist
+          cp -r index.html assets data dist/
+          rm -rf dist/data/.cache dist/data/auth dist/data/browser-out
+          # 种子数据仅在 events.json 缺失时兜底，线上不需要
+          rm -f dist/data/seed-events.json
+          du -sh dist
+
+      - name: 配置 Pages
+        uses: actions/configure-pages@v5
+
+      - name: 上传站点产物
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - name: 部署到 GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

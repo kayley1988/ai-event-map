@@ -682,7 +682,7 @@
         ${e.host ? `<div class="dt-row"><span class="ico">🏛</span><span><b>主办方：</b><span class="val">${esc(e.host)}</span></span></div>` : ''}
         ${e.source ? `<div class="dt-row"><span class="ico">📡</span><span><b>来源：</b><span class="val">${esc(sourceLabel(e.source))}</span></span></div>` : ''}
       </div>
-      ${e.summary ? `<p class="dt-desc">${esc(e.summary)}</p>` : ''}
+      ${e.content || e.desc || e.summary ? `<div class="dt-desc" id="dtDesc">${esc(e.content || e.desc || e.summary)}</div>` : ''}
       ${(e.highlights || []).length ? `
         <div class="dt-points">
           <h4>活动要点</h4>
@@ -738,91 +738,135 @@
       return;
     }
 
-    // 当前显示的月份（默认今天所在月），翻页用 ◀ ▶
-    if (!state.calMonth) {
-      const now = new Date();
-      state.calMonth = { y: now.getFullYear(), m: now.getMonth() };
-    }
-    const { y, m } = state.calMonth;
+    // 视图模式：月历表格 / 列表卡片（记住用户选择）
+    state.calMode = localStorage.getItem('calMode') === 'list' ? 'list' : 'month';
+    const mode = state.calMode;
 
-    // 把活动铺到月的每一天（跨天活动每天都出现）
-    const byDay = {};
-    const noDate = [];
-    for (const e of items) {
-      const s = parseDate(e.dateStart);
-      if (!s) { noDate.push(e); continue; }
-      const end = parseDate(e.dateEnd) || s;
-      for (let d = new Date(s); d <= end; d.setDate(d.getDate() + 1)) {
-        if (d.getFullYear() === y && d.getMonth() === m) {
-          (byDay[d.getDate()] = byDay[d.getDate()] || []).push(e);
-        }
-        if (d.getFullYear() > end.getFullYear()) break;
+    let body = '';
+    let navTitle = '';
+
+    if (mode === 'month') {
+      // ---- 月历表格 ----
+      if (!state.calMonth) {
+        const now = new Date();
+        state.calMonth = { y: now.getFullYear(), m: now.getMonth() };
       }
-    }
+      const { y, m } = state.calMonth;
 
-    // 有活动可看的月份（用于限制翻页范围）
-    const monthKeys = new Set(items.map((e) => (e.dateStart || '').slice(0, 7)));
-    const monthKey = `${y}-${String(m + 1).padStart(2, '0')}`;
+      // 把活动铺到月的每一天（跨天活动每天都出现）
+      const byDay = {};
+      const noDate = [];
+      for (const e of items) {
+        const s = parseDate(e.dateStart);
+        if (!s) { noDate.push(e); continue; }
+        const end = parseDate(e.dateEnd) || s;
+        for (let d = new Date(s); d <= end; d.setDate(d.getDate() + 1)) {
+          if (d.getFullYear() === y && d.getMonth() === m) {
+            (byDay[d.getDate()] = byDay[d.getDate()] || []).push(e);
+          }
+        }
+      }
 
-    const first = new Date(y, m, 1);
-    const offset = (first.getDay() + 6) % 7; // 周一开头
-    const daysInMonth = new Date(y, m + 1, 0).getDate();
-    const now = new Date();
-    const isThisMonth = now.getFullYear() === y && now.getMonth() === m;
-    const minKey = [...monthKeys].sort()[0];
-    const maxKey = [...monthKeys].sort().pop();
-    const canPrev = monthKey > minKey;
-    const canNext = monthKey < maxKey;
+      const monthKey = `${y}-${String(m + 1).padStart(2, '0')}`;
+      const first = new Date(y, m, 1);
+      const offset = (first.getDay() + 6) % 7; // 周一开头
+      const daysInMonth = new Date(y, m + 1, 0).getDate();
+      const now = new Date();
+      const isThisMonth = now.getFullYear() === y && now.getMonth() === m;
+      const sortedKeys = [...new Set(items.map((e) => (e.dateStart || '').slice(0, 7)))].sort();
+      const canPrev = monthKey > sortedKeys[0];
+      const canNext = monthKey < sortedKeys[sortedKeys.length - 1];
 
-    let cells = '';
-    for (let i = 0; i < offset; i++) cells += '<div class="cal-cell is-blank"></div>';
-    for (let day = 1; day <= daysInMonth; day++) {
-      const evs = (byDay[day] || []).sort((a, b) => String(a.dateStart).localeCompare(String(b.dateStart)));
-      const isToday = isThisMonth && now.getDate() === day;
-      cells += `
-        <div class="cal-cell${isToday ? ' is-today' : ''}">
-          <div class="cal-day">${day}${isToday ? '<span class="cal-today-tag">今天</span>' : ''}</div>
-          <div class="cal-evs">${evs.map((e) => {
-            const isStart = (e.dateStart || '').slice(0, 10) === `${monthKey}-${String(day).padStart(2, '0')}`;
-            return `<button class="cal-ev t-${e.type}${isStart ? '' : ' is-cont'}" data-id="${esc(e.id)}"
-              title="${esc(e.title)} · ${esc(e.city)}${e.venue && e.venue !== '待定' ? ' · ' + esc(e.venue) : ''}">
-              ${highlightTitle(e.title)}</button>`;
-          }).join('')}</div>
-        </div>`;
+      let cells = '';
+      for (let i = 0; i < offset; i++) cells += '<div class="cal-cell is-blank"></div>';
+      for (let day = 1; day <= daysInMonth; day++) {
+        const evs = (byDay[day] || []).sort((a, b) => String(a.dateStart).localeCompare(String(b.dateStart)));
+        const isToday = isThisMonth && now.getDate() === day;
+        cells += `
+          <div class="cal-cell${isToday ? ' is-today' : ''}">
+            <div class="cal-day">${day}${isToday ? '<span class="cal-today-tag">今天</span>' : ''}</div>
+            <div class="cal-evs">${evs.map((e) => {
+              const isStart = (e.dateStart || '').slice(0, 10) === `${monthKey}-${String(day).padStart(2, '0')}`;
+              return `<button class="cal-ev t-${e.type}${isStart ? '' : ' is-cont'}" data-id="${esc(e.id)}"
+                title="${esc(e.title)} · ${esc(e.city)}${e.venue && e.venue !== '待定' ? ' · ' + esc(e.venue) : ''}">
+                ${highlightTitle(e.title)}</button>`;
+            }).join('')}</div>
+          </div>`;
+      }
+
+      navTitle = `${y} 年 ${m + 1} 月${isThisMonth ? ' · 本月' : ''}`;
+      body = `
+        <div class="cal-month">
+          <div class="cal-dow">周一</div><div class="cal-dow">周二</div><div class="cal-dow">周三</div>
+          <div class="cal-dow">周四</div><div class="cal-dow">周五</div><div class="cal-dow">周六</div>
+          <div class="cal-dow is-weekend">周日</div>
+          ${cells}
+        </div>
+        ${noDate.length ? `
+          <div class="cal-undated">
+            <h3>日期待定（${noDate.length} 场）</h3>
+            ${noDate.map(calItem).join('')}
+          </div>` : ''}
+        <p class="cal-hint">💡 点击格子里的活动名可看详情；跨天的活动会在每一天都出现</p>
+      `;
+
+      setTimeout(() => {
+        $('#calPrev')?.addEventListener('click', () => {
+          state.calMonth = m === 0 ? { y: y - 1, m: 11 } : { y, m: m - 1 };
+          renderCalendar();
+        });
+        $('#calNext')?.addEventListener('click', () => {
+          state.calMonth = m === 11 ? { y: y + 1, m: 0 } : { y, m: m + 1 };
+          renderCalendar();
+        });
+        $('#calBack')?.addEventListener('click', () => {
+          state.calMonth = { y: now.getFullYear(), m: now.getMonth() };
+          renderCalendar();
+        });
+      }, 0);
+    } else {
+      // ---- 列表卡片（按日期分组） ----
+      const groups = {};
+      for (const e of items) {
+        const key = (e.dateStart || '未定').slice(0, 10);
+        (groups[key] = groups[key] || []).push(e);
+      }
+      const keys = Object.keys(groups).sort((a, b) => a.localeCompare(b));
+      navTitle = `全部活动 · ${items.length} 场`;
+      body = keys.map((key) => {
+        const s = parseDate(key);
+        const dayLabel = s ? `${s.getFullYear()} 年 ${s.getMonth() + 1} 月 ${s.getDate()} 日 周${WEEKDAY[s.getDay()]}` : '日期待定';
+        const items2 = groups[key].sort((a, b) => String(a.dateStart).localeCompare(String(b.dateStart)));
+        return `
+          <div class="cal-group">
+            <div class="cal-group-head">
+              <b>${esc(dayLabel)}</b>
+              <span>${items2.length} 场</span>
+            </div>
+            ${items2.map(calItem).join('')}
+          </div>`;
+      }).join('');
     }
 
     list.innerHTML = `
       <div class="cal-nav">
-        <button class="btn" id="calPrev" ${canPrev ? '' : 'disabled'}>◀ 上个月</button>
-        <h2 class="cal-month-title">${y} 年 ${m + 1} 月${isThisMonth ? ' · 本月' : ''}</h2>
-        <button class="btn" id="calNext" ${canNext ? '' : 'disabled'}>下个月 ▶</button>
-        ${isThisMonth ? '' : '<button class="btn btn-primary" id="calBack">回到本月</button>'}
+        <div class="cal-mode">
+          <button class="chip${mode === 'month' ? ' is-active' : ''}" data-cmode="month">月历</button>
+          <button class="chip${mode === 'list' ? ' is-active' : ''}" data-cmode="list">列表</button>
+        </div>
+        <h2 class="cal-month-title">${esc(navTitle)}</h2>
+        ${mode === 'month' ? `
+          <button class="btn" id="calPrev">◀ 上个月</button>
+          <button class="btn" id="calNext">下个月 ▶</button>
+          ${/本月/.test(navTitle) ? '' : '<button class="btn btn-primary" id="calBack">回到本月</button>'}` : ''}
       </div>
-      <div class="cal-month">
-        <div class="cal-dow">周一</div><div class="cal-dow">周二</div><div class="cal-dow">周三</div>
-        <div class="cal-dow">周四</div><div class="cal-dow">周五</div><div class="cal-dow">周六</div>
-        <div class="cal-dow is-weekend">周日</div>
-        ${cells}
-      </div>
-      ${noDate.length ? `
-        <div class="cal-undated">
-          <h3>日期待定（${noDate.length} 场）</h3>
-          ${noDate.map(calItem).join('')}
-        </div>` : ''}
-      <p class="cal-hint">💡 点击格子里的活动名可看详情；跨天的活动会在每一天都出现</p>
-    `;
+      ${body}`;
 
-    $('#calPrev')?.addEventListener('click', () => {
-      state.calMonth = m === 0 ? { y: y - 1, m: 11 } : { y, m: m - 1 };
-      renderCalendar();
-    });
-    $('#calNext')?.addEventListener('click', () => {
-      state.calMonth = m === 11 ? { y: y + 1, m: 0 } : { y, m: m + 1 };
-      renderCalendar();
-    });
-    $('#calBack')?.addEventListener('click', () => {
-      state.calMonth = { y: now.getFullYear(), m: now.getMonth() };
-      renderCalendar();
+    $$('#calendarList [data-cmode]').forEach((b) => {
+      b.addEventListener('click', () => {
+        localStorage.setItem('calMode', b.dataset.cmode);
+        renderCalendar();
+      });
     });
 
     $$('#calendarList .cal-ev').forEach((b) => {

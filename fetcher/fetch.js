@@ -208,14 +208,52 @@ async function resolveSogouUrl(u) {
 const FETCH_DETAIL_LIMIT = 45;   // 最多回源多少条
 const DETAIL_MIN_SCORE = 6;     // 分数够高才值得回源
 
+/**
+ * 从落地页 HTML 提取正文主体：
+ * 优先微信公众号 js_content / <article>，否则整页剥标签后
+ * 砍掉头部导航和尾部噪音，只留活动相关的核心段落
+ */
+function extractMainText(html) {
+  let text = '';
+  const jc = html.match(/<div[^>]*id="js_content"[^>]*>([\s\S]*?)<script/i);
+  if (jc) text = stripTags(jc[1]);
+  if (!text || text.length < 80) {
+    const a = html.match(/<article[^>]*>([\s\S]*?)<\/article>/i);
+    if (a) text = stripTags(a[1]);
+  }
+  if (!text || text.length < 80) {
+    text = stripTags(html);
+    // 头部：从第一个活动相关关键词开始（跳过站点导航/菜单）
+    const kw = text.match(/(?:报名|活动时间|活动介绍|大赛|黑客松|大会|峰会|沙龙|讲座|论坛|议程|嘉宾|日程)/);
+    if (kw && kw.index > 0) text = text.slice(kw.index);
+    // 尾部：只砍强噪音标记，且仅当出现在全文后 40% 区域（避免误砍正文）
+    const tail = text.search(/(阅读原文|下一篇|相关阅读|上一篇|免责声明|喜欢此内容|人划线|微信扫一扫|扫码关注|Copyri?ght|版权所有)/);
+    if (tail > text.length * 0.5) text = text.slice(0, tail);
+  }
+  return text.replace(/\s+/g, ' ').trim();
+}
+
 async function fetchDetail(it) {
   if (!it.url || !/^https?:/i.test(it.url)) return it;
-  // 搜狗跳转链接无法直接回源，跳过
-  if (it.url.includes('weixin.sogou.com')) return it;
-  const r = await httpGet(it.url, { headers: { Referer: 'https://cn.bing.com/' } });
-  if (!r || !r.text) return it;
-  const text = stripTags(r.text).slice(0, 12000);
-  return { ...it, detail: text };
+  let url = it.url;
+  let html = null;
+  if (url.includes('weixin.sogou.com')) {
+    // 搜狗跳转链接 → 还原真实微信文章地址再抓正文；反爬拦截则保留搜索摘要
+    const real = await resolveSogouUrl(url);
+    if (!real || real === url) return it;
+    url = real;
+    const r = await httpGet(url, { headers: { Referer: 'https://weixin.sogou.com/' } });
+    if (!r || !r.text) return it;
+    html = r.text;
+  } else {
+    const r = await httpGet(url, { headers: { Referer: 'https://cn.bing.com/' } });
+    if (!r || !r.text) return it;
+    html = r.text;
+  }
+  const content = extractMainText(html).slice(0, 3000);
+  // 正文太短说明被反爬页/空壳页骗了，退回搜索摘要
+  if (content.length < 120) return { ...it, url };
+  return { ...it, url, detail: content };
 }
 
 /* ------------------------------------------------------------------ */
@@ -346,13 +384,16 @@ function buildEvent(it) {
     audience: audience || '',
     highlight: false,
     url: it.url || '',
-    desc: (it.desc || it.detail || '').slice(0, 400),
+    // desc = 搜索摘要（短，卡片用）；content = 回源正文（长，详情弹窗用）
+    desc: (it.desc || '').slice(0, 400),
+    content: (it.detail || '').slice(0, 3000),
     source: it.sourceName || '',
     sourceUrl: it.url || '',
     sample: false,
     host: it.account || '',
   };
-  ev.summary = buildSummary(ev);
+  // 摘要尽量从完整正文生成，质量更高
+  ev.summary = buildSummary({ ...ev, desc: ev.content || ev.desc });
   ev.highlights = highlights;
   return ev;
 }

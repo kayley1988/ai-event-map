@@ -118,6 +118,8 @@ function main() {
     const bArgs = skip ? ['--skip', skip] : [];
     const r = run(path.join(__dirname, 'browser-fetch.js'), bArgs);
     if (r) run(path.join(__dirname, 'merge-browser.js'));
+    // 2.5 浏览器补正文：对缺全文的活动回源渲染页面
+    run(path.join(__dirname, 'detail-browser.js'));
   }
 
   // 3. 聚合站

@@ -824,7 +824,20 @@
         ${e.host ? `<div class="dt-row"><span class="ico">🏛</span><span><b>主办方：</b><span class="val">${esc(e.host)}</span></span></div>` : ''}
         ${e.source ? `<div class="dt-row"><span class="ico">📡</span><span><b>来源：</b><span class="val">${esc(sourceLabel(e.source))}</span></span></div>` : ''}
       </div>
-      ${e.content || e.desc || e.summary ? `<div class="dt-desc" id="dtDesc">${esc(e.content || e.desc || e.summary)}</div>` : ''}
+      ${(() => {
+        // 正文区：content > desc > summary 依次降级。
+        // 但聚合站（OPC 圈/活动行）经常只有「标题重复」或「标题（区名）」，没有信息量，
+        // 这种冗余文案直接不渲染，避免弹窗里出现一行没用的重复标题。
+        const body = String(e.content || e.desc || e.summary || '').trim();
+        if (!body) return '';
+        const t = String(e.title || '').trim();
+        const norm = (x) => x.replace(/[\s｜|（）()·、,，.。\-—－]/g, '');
+        const nb = norm(body);
+        const nt = norm(t);
+        // 完全等于标题 / 只是标题 + 城市或区名后缀 / 太短
+        const redundant = nb === nt || (nt && nb.startsWith(nt) && nb.length - nt.length <= 6) || nb.length < 8;
+        return redundant ? '' : `<div class="dt-desc" id="dtDesc">${esc(body)}</div>`;
+      })()}
       ${(e.highlights || []).length ? `
         <div class="dt-points">
           <h4>活动要点</h4>

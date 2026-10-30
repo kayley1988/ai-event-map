@@ -22,3 +22,5 @@ fetcher/tmp-*.js
 opc-page.png
 api_push.py
 .workbuddy/
+probe_*.js
+verify_*.js

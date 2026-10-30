@@ -18,3 +18,7 @@ verify_local.js
 *-map.png
 *-cal.png
 *-articles.png
+fetcher/tmp-*.js
+opc-page.png
+api_push.py
+.workbuddy/

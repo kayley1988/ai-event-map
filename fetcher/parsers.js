@@ -290,9 +290,11 @@ function trimSeoTail(title) {
   if (parts.length < 3) return title;
   // 保留到最后一个含活动形态词的分段为止
   let keep = 0;
+  let hasForm = false;
   for (let i = 0; i < parts.length; i++) {
-    if (TITLE_FORM_WORDS.test(parts[i])) keep = i;
+    if (TITLE_FORM_WORDS.test(parts[i])) { keep = i; hasForm = true; }
   }
+  if (!hasForm) return title;           // 没有形态词 → 无从判断哪段是尾巴，整串保留
   if (keep >= parts.length - 1) return title;
   const kept = parts.slice(0, keep + 1).join('：').trim();
   // 截断后过短则保留原标题，避免把有效标题清空
@@ -323,9 +325,14 @@ function cleanTitle(raw) {
     }
   }
   t = t.replace(/^活动\s*[|｜·\-—]?\s*/, '')
-       .replace(/\s*[|｜]\s*活动\s*[|｜]?\s*/g, ' ')
+       // 「｜活动｜」这类分隔用的活动字样才去掉；
+       // 不能无条件删「活动」二字，否则「｜活动预告」会被砍成「｜预告」
+       .replace(/\s*[|｜]\s*活动(\s*[|｜])/g, ' ')
+       .replace(/\s*[|｜]\s*活动\s*$/g, ' ')
        .replace(/\s*\|\s*$/, '')
        .trim();
+  // 清掉清洗后残留的首尾分隔符
+  t = t.replace(/^[\s|｜·\-—]+/, '').replace(/[\s|｜·\-—]+$/, '').trim();
   t = t.replace(/\s+/g, ' ').trim();
   t = t.replace(/[,，]\s*$/, '').trim();
   t = trimSeoTail(t);
@@ -333,29 +340,69 @@ function cleanTitle(raw) {
   return t;
 }
 
+/**
+ * 站点拼接出来的「样板段」：来源名 / 分类标签 / 纯日期 / 纯城市。
+ * 这些不是活动名的一部分，需要从标题里剔除。
+ */
+const TITLE_BOILERPLATE = [
+  /^(活动行|OPC圈|AI赛事通|公众号|赛氪|小程序|华为云|ModelScope|GitCode)$/i,
+  /^(大会\/峰会|沙龙\/交流|黑客松\/竞赛|培训\/工作坊|展览\/展会|路演\/投融资|活动|赛事|发布会)$/,
+  /^\d{1,2}\s*月\s*\d{1,2}\s*日\s*(开始|截止)?$/,
+  /^(线上活动|线上)$/,
+];
+
+/** 该段是否只是样板信息（来源 / 分类 / 日期 / 城市） */
+function isBoilerplatePart(s) {
+  const t = String(s || '').trim();
+  if (!t) return true;
+  return TITLE_BOILERPLATE.some((re) => re.test(t));
+}
+
+/**
+ * 标题精修
+ * ------------------------------------------------------------
+ * 站点经常把「来源｜分类｜标题｜日期｜城市」拼成一个字符串，
+ * 也存在标题本身合法包含「｜」的情况（如「GAIC | 杭州城市合伙人招募」）。
+ * 所以这里不是「按 ｜ 切分后挑最优段」——那会误伤含 ｜ 的真标题，
+ * 也会把「活动行｜大会/峰会｜10月30日｜城市」这种结构串当标题。
+ *
+ * 正确做法：
+ *   1. 按 ｜ 切分，剔除样板段（来源名 / 分类标签 / 纯日期 / 线上）
+ *   2. 若确实剔除了样板段 → 说明原串是结构串，用剩下的真标题
+ *   3. 若一段样板都没剔 → 说明 ｜ 是标题自带的分隔符，整串保留
+ */
 function refineTitle(rawTitle, desc) {
   const t = cleanTitle(rawTitle);
+
   const parts = t.split(/\s*[|｜]\s*/).map((s) => s.trim()).filter(Boolean);
-  const cands = parts.length > 1 ? parts : [t];
-
-  const score = (s) => {
-    let v = 0;
-    if (/黑客松|hackathon|大会|峰会|论坛|沙龙|meetup|开发者日|训练营/i.test(s)) v += 5;
-    if (/AI|人工智能|大模型|LLM|Agent/i.test(s)) v += 4;
-    if (/报名|启动|开启/.test(s)) v -= 3;
-    if (s.length >= 8 && s.length <= 40) v += 2;
-    if (/^活动$|活动$/.test(s)) v -= 4;
-    return v;
-  };
-
-  const best = cands.slice().sort((a, b) => score(b) - score(a))[0];
-  const title = best && score(best) > 0 ? best : t;
-
-  if (title.replace(/[^\u4e00-\u9fa5a-z0-9]/gi, '').length < 6 && desc) {
-    const first = desc.split(/[。！？\n]/)[0].trim();
-    if (first && first.length >= 8) return first.slice(0, 50);
+  if (parts.length > 1) {
+    const meaningful = parts.filter((p) => !isBoilerplatePart(p));
+    // 确实剔掉了样板段 → 原串是「来源｜分类｜标题｜日期｜城市」结构串
+    if (meaningful.length && meaningful.length < parts.length) {
+      const score = (s) => {
+        let v = 0;
+        if (/黑客松|hackathon|大会|峰会|论坛|沙龙|meetup|开发者日|训练营|工作坊/i.test(s)) v += 5;
+        if (/AI|人工智能|大模型|LLM|Agent/i.test(s)) v += 4;
+        if (/报名|启动|开启/.test(s)) v -= 3;
+        if (s.length >= 8 && s.length <= 40) v += 2;
+        if (/^活动$|活动$/.test(s)) v -= 4;
+        return v;
+      };
+      const best = meaningful.slice().sort((a, b) => score(b) - score(a))[0];
+      if (best && score(best) > 0) return best;
+      return meaningful.join('｜');
+    }
   }
-  return title;
+
+  if (t.replace(/[^\u4e00-\u9fa5a-z0-9]/gi, '').length < 6 && desc) {
+    // desc 也可能是「标题｜日期｜城市」结构串，不能整段当标题
+    const first = desc.split(/[。！？\n]/)[0].trim();
+    const segs = first.split(/\s*[|｜]\s*/).map((s) => s.trim()).filter(Boolean);
+    const usable = segs.length > 1 ? segs.filter((s) => !isBoilerplatePart(s)) : segs;
+    const pick = (usable.length ? usable : segs).sort((a, b) => b.length - a.length)[0] || '';
+    if (pick && pick.replace(/[^\u4e00-\u9fa5a-z0-9]/gi, '').length >= 6) return pick.slice(0, 60);
+  }
+  return t;
 }
 
 function isPastEvent(title, desc) {
@@ -470,10 +517,22 @@ function buildSummary(ev) {
   }
 
   // 2. 聚合站赛事：按里程碑信息合成
-  if (/提交截止|报名截止|作品提交|报名与作品|开放报名|截止/.test(desc)) {
+  //    仅适用于全球聚合站（AI Competition Radar）。本地赛事同样会出现「截止」字样，
+  //    但它们是线下活动，不能套用「全球线上、不限国籍」的文案。
+  if (ev.source === 'AI Competition Radar' &&
+      /提交截止|报名截止|作品提交|报名与作品|开放报名|截止/.test(desc)) {
     const label = (desc.match(/(提交截止|作品提交截止|报名与作品提交截止|报名截止|报名与作品截止)/) || [])[1] || '关键节点';
     const type = ev.type === 'hackathon' ? '黑客松' : 'AI 赛事';
     return `全球线上${type}，${label}节点见原文。注册账号后提交作品即可参与，通常不限国籍与地区。`;
+  }
+
+  // 2.5 本地赛事只有「截止」节点：据实说明是报名/投稿截止
+  if (/截止/.test(desc)) {
+    const where = ev.city && ev.city !== '线上' ? `${ev.city}` : '';
+    const type = ev.type === 'hackathon' ? '黑客松' : '赛事';
+    return where
+      ? `${where}${type}报名/投稿已开放，${desc.match(/(\d{1,2}月\d{1,2}日)/) ? desc.match(/(\d{1,2}月\d{1,2}日)/)[1] : ''}截止，详情见原文。`
+      : `${type}报名/投稿已开放，${desc.match(/(\d{1,2}月\d{1,2}日)/) ? desc.match(/(\d{1,2}月\d{1,2}日)/)[1] : ''}截止，详情见原文。`;
   }
 
   // 3. 无正文：按类型合成一句

@@ -1,14 +1,14 @@
 name: 抓取数据并部署
 
 # 触发方式：
-#   1. 定时：每天北京时间 09:01 自动抓取 + 部署
+#   1. 定时：每周一北京时间 09:01 自动抓取 + 部署
 #   2. 手动：仓库 Actions 页面点 "Run workflow"
 #   3. push：只走部署，不重复抓取
 on:
   schedule:
-    # GitHub Actions 的 cron 是 UTC。北京 09:01 = UTC 01:01
+    # GitHub Actions 的 cron 是 UTC。北京周一 09:01 = UTC 周一 01:01
     # 高峰时段（UTC 00:00）会延迟几分钟，所以错开整点
-    - cron: '1 1 * * *'
+    - cron: '1 1 * * 1'
   workflow_dispatch:
   push:
     branches: [main]

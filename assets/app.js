@@ -207,7 +207,7 @@
       <span class="ss-item"><b>${evs.length}</b> 场活动</span>
       <span class="ss-item"><b>${hacks}</b> 场黑客松</span>
       <span class="ss-item"><b>${sources}</b> 个数据源</span>
-      <span class="ss-item ss-muted">每天 09:01 自动抓取更新</span>`;
+      <span class="ss-item ss-muted">每周一 09:01 自动抓取更新</span>`;
   }
 
   /* ---------------- AI 资讯 ---------------- */
@@ -272,7 +272,7 @@
       listEl.innerHTML = `<div class="empty">
         <div class="empty-emoji">📰</div>
         <p>资讯加载中或暂无文章</p>
-        <small>数据每日自动更新</small>
+        <small>数据每周自动更新</small>
       </div>`;
       return;
     }
@@ -588,7 +588,7 @@
       el.innerHTML = `<div class="empty" style="grid-column:1/-1">
         <div class="empty-emoji">🗓️</div>
         <p>暂无即将开始的${esc(city)}活动</p>
-        <small>活动数据每日自动更新，可稍后再来看看</small>
+        <small>活动数据每周自动更新，可稍后再来看看</small>
       </div>`;
     } else {
       el.innerHTML = list.map((e) => evCard(e)).join('');
@@ -875,7 +875,7 @@
       list.innerHTML = `<div class="empty">
         <div class="empty-emoji">📭</div>
         <p>${filter === 'mine' ? '还没有关注任何活动' : '该分类下暂无活动'}</p>
-        <small>${filter === 'mine' ? '在活动卡片上点击 ☆ 即可加入关注' : '数据每日自动更新'}</small>
+        <small>${filter === 'mine' ? '在活动卡片上点击 ☆ 即可加入关注' : '数据每周自动更新'}</small>
       </div>`;
       return;
     }

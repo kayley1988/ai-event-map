@@ -3,7 +3,7 @@
 全国 AI 黑客松 / 开发者大会 / 技术峰会的实时更新地图。
 
 **🔗 线上地址：<https://kayley1988.github.io/ai-event-map/>**
-（每天 09:01 自动抓取更新，由 GitHub Actions 全自动维护，见 `deploy/GitHub-Actions.md`）
+（每周一 09:01 自动抓取更新，由 GitHub Actions 全自动维护，见 `deploy/GitHub-Actions.md`）
 
 - **全国地图**：点击城市查看当地活动
 - **倒排日历**：按日期倒序排列，标注 D-N 剩余天数
@@ -130,7 +130,7 @@ node fetcher/browser-fetch.js --platform xhs --login
 
 **1. GitHub Actions（推荐，无需开机）**
 
-`.github/workflows/update-and-deploy.yml`，每天北京时间 09:01
+`.github/workflows/update-and-deploy.yml`，每周一北京时间 09:01
 （UTC `cron: '1 1 * * *'`）自动执行：
 
 ```

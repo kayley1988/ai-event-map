@@ -57,19 +57,53 @@ function isBlockedPage(text) {
  */
 const TEMPLATE_TOKEN_RE = /\{\{(?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*\}\}/g;
 
+/**
+ * 活动行详情页的「页面骨架文案」
+ * ------------------------------------------------------------
+ * 活动行（huodongxing）是 Vue SPA，body.innerText 里正常中文只有这些固定 UI 文案：
+ *   查看该场地更多活动 / 精彩城市生活，尽在活动行！/ 即刻下载APP，享专属会员权益
+ *   下载活动行APP / iOS 下载 / android 下载 / 报名/查看原文
+ * 加上标题重复、主办方名、「用户7933、747796***」这类打码用户名，
+ * 剥离占位符后仍能凑出 100+ 字，导致旧阈值（60 字）误判为有效正文。
+ * 这里按「剩余长度」判定：剥掉占位符和骨架文案后仍剩不足 40 字 → 无效。
+ */
+const SCAFFOLD_PATTERNS = [
+  /查看该场地更多活动/g,
+  /精彩城市生活，尽在活动行[！!]?/g,
+  /即刻下载APP，享专属会员权益/g,
+  /下载活动行APP/g,
+  /(?:iOS|android|IOS|Android)\s*下载/g,
+  /报名\/查看原文|报名\/查看|查看原文/g,
+  /^\s*[「」\s]*$/gm,
+  /用户\d{4,}[、,\s]*|\d{6,}\*+/g,
+];
+
 function stripTemplateTokens(text) {
   return String(text || '').replace(TEMPLATE_TOKEN_RE, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/** 剥掉模板占位符 + 站点骨架文案，得到「真正有信息量的正文」 */
+function stripScaffold(text) {
+  let t = stripTemplateTokens(text);
+  for (const re of SCAFFOLD_PATTERNS) t = t.replace(re, ' ');
+  return t.replace(/\s+/g, ' ').trim();
 }
 
 /** 是否是「模板占位符占了绝大多数」的无效正文 */
 function isTemplateGarbage(text) {
   const raw = String(text || '');
   if (!raw) return true;
-  const stripped = stripTemplateTokens(raw);
-  if (stripped.length >= 60) return false;
-  // 占位符 token 数量占原文比例过高 → 判定为未渲染
+  // 有占位符才走这套判定；纯正文不受影响
   const tokens = (raw.match(/\{\{/g) || []).length;
-  return tokens > 0 && stripped.length < raw.length * 0.35;
+  if (tokens === 0) return false;
+
+  // 剥掉占位符 + 骨架文案后，剩下的才算有效信息
+  const meaningful = stripScaffold(raw);
+  if (meaningful.length < 40) return true;
+
+  // 占位符里的字符量远大于有效正文 → 说明正文主体根本没渲染出来
+  const tokenChars = raw.length - stripTemplateTokens(raw).length;
+  return tokenChars > meaningful.length * 3;
 }
 
 async function main() {

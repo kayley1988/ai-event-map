@@ -169,11 +169,47 @@ function parseRss(xml, sourceName) {
   return out;
 }
 
+/* ---------------- 公众号文章（复用活动库里的公众号条目） ---------------- */
+
+/**
+ * 活动库里已经抓过一批公众号文章（fetch.js 的搜狗微信源），
+ * 其中带全文的可以直接作为资讯展示，不必再去搜狗二次请求（搜狗链接易过期）。
+ */
+function parseWechatEvents() {
+  const p = path.join(ROOT, 'data', 'events.json');
+  if (!fs.existsSync(p)) return [];
+  let db;
+  try { db = JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return []; }
+  const out = [];
+  for (const e of db.events || []) {
+    const isMp = /公众号|mp\.weixin|sogou/.test(`${e.source || ''} ${e.url || ''}`);
+    if (!isMp) continue;
+    const body = (e.content || e.desc || '').trim();
+    if (body.length < 120) continue;               // 太短的不是完整文章
+    out.push({
+      id: `mp-${(e.id || '').slice(0, 40)}`,
+      title: e.title,
+      excerpt: (e.summary || body).slice(0, 160),
+      content: body.slice(0, 6000),
+      url: e.url,
+      source: '公众号',
+      category: /Agent|智能体/i.test(e.title) ? '智能体' : '资讯',
+      date: e.dateStart || '',
+      minutes: Math.max(2, Math.round(body.length / 400)),
+      image: '',
+    });
+  }
+  return out;
+}
+
 /* ---------------- 主流程 ---------------- */
 
 async function main() {
   console.log('▶ 采集 AI 资讯文章…');
-  const jobs = [{ name: 'ClawHunt', run: async () => parseClawhunt(await httpGet(CLAWHUNT_URL)) }]
+  const jobs = [
+    { name: 'ClawHunt', run: async () => parseClawhunt(await httpGet(CLAWHUNT_URL)) },
+    { name: '公众号(活动库)', run: async () => parseWechatEvents() },
+  ]
     .concat(SOURCES.filter((s) => s.type === 'rss').map((s) => ({
       name: s.name,
       run: async () => parseRss(await httpGet(s.url), s.name),
@@ -193,13 +229,21 @@ async function main() {
   // 去重 + 排序 + 截断
   const seen = new Set();
   const uniq = all.filter((a) => {
-    const k = a.url.replace(/[?#].*$/, '');
+    const raw = String(a.url || '');
+    // 公众号文章 ID 常在 query 里（mp.weixin.qq.com/s?__biz=...&mid=...），
+    // 无脑去掉 query 会把所有公众号文章压成同一个 URL 而误杀
+    const isMp = /mp\.weixin\.qq\.com|weixin\.sogou\.com/.test(raw);
+    const k = isMp ? raw : raw.replace(/[?#].*$/, '');
     if (seen.has(k)) return false;
     seen.add(k);
     return true;
   });
   uniq.sort((a, b) => String(b.date).localeCompare(String(a.date)));
-  const articles = uniq.slice(0, 60);
+  // 截断时优先保留带全文的（公众号 / ClawHunt 可站内阅读），
+  // 否则它们会因日期较早被纯链接的 RSS 条目挤出去
+  const withBody = uniq.filter((a) => a.content && a.content.length > 200);
+  const rest = uniq.filter((a) => !(a.content && a.content.length > 200));
+  const articles = withBody.concat(rest).slice(0, 120);
 
   // ClawHunt 文章静态可解析 → 直接抓全文存 content（站内阅读器用）
   const clawhunt = articles.filter((a) => a.source === 'ClawHunt');

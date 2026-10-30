@@ -1435,10 +1435,12 @@ a { color: inherit; }
 
 .cal-month {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  /* minmax(0, 1fr)：默认的 1fr 最小宽度是 auto，长标题会把列撑宽导致内容溢出格子（"穿孔"） */
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   border-left: 2px solid var(--ink);
   background: var(--card);
   margin: 20px 28px;
+  overflow: hidden;
 }
 .cal-dow {
   padding: 9px 10px;
@@ -1480,10 +1482,12 @@ a { color: inherit; }
   letter-spacing: 0;
 }
 
-.cal-evs { margin-top: 4px; display: flex; flex-direction: column; gap: 3px; }
+.cal-evs { margin-top: 4px; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .cal-ev {
   display: block;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   text-align: left;
   padding: 3px 7px;
   border: 1.5px solid var(--ink);

@@ -87,6 +87,29 @@ const SOURCES = [
     ],
     weight: 4,
   },
+  {
+    // 按公众号名定向检索，补足 AI 资讯频道里的公众号内容
+    // （原来是关键词式搜索，命中的多是活动报名帖，缺少行业媒体文章）
+    id: 'sogou-mp-media',
+    name: '公众号 · AI 媒体',
+    type: 'wechat',
+    url: 'https://weixin.sogou.com/weixin?type=2&query={q}&ie=utf8',
+    queries: [
+      '机器之心 Agent',
+      '量子位 大模型',
+      '新智元 AI',
+      '智东西 大模型',
+      'AI科技评论 智能体',
+      'InfoQ 大模型',
+      '甲子光年 AI',
+      '硅星人 AI',
+      'Founder Park 黑客松',
+      'AI产品榜 智能体',
+      '特工宇宙 Agent',
+      '腾讯科技 大模型',
+    ],
+    weight: 3,
+  },
 
   /* ============ RSS 源：AI 媒体的活动报道 ============ */
   {
@@ -112,6 +135,38 @@ const SOURCES = [
     url: 'https://sspai.com/feed',
     queries: ['黑客松', '大会', '活动'],
     weight: 1,
+  },
+  {
+    id: 'rss-qbitai',
+    name: '量子位',
+    type: 'rss',
+    url: 'https://www.qbitai.com/feed',
+    queries: ['大模型', 'Agent', 'AI', '活动'],
+    weight: 3,
+  },
+  {
+    id: 'rss-ifanr',
+    name: '爱范儿',
+    type: 'rss',
+    url: 'https://www.ifanr.com/feed',
+    queries: ['AI', '大模型', '智能'],
+    weight: 2,
+  },
+  {
+    id: 'rss-leiphone',
+    name: '雷峰网',
+    type: 'rss',
+    url: 'https://www.leiphone.com/feed',
+    queries: ['AI', '大模型', '智能体'],
+    weight: 2,
+  },
+  {
+    id: 'rss-geekpark',
+    name: '极客公园',
+    type: 'rss',
+    url: 'https://www.geekpark.net/rss',
+    queries: ['AI', '大模型', 'Agent'],
+    weight: 2,
   },
   {
     id: 'rss-synced',

@@ -142,6 +142,8 @@ function main() {
   }
 
   // 3.5 AI 资讯文章流（ClawHunt 官方文章 + RSS 媒体）
+  //     36氪 反爬需浏览器渲染，先用独立采集器产出，再由 collect-articles 读取
+  if (!httpOnly) run(path.join(__dirname, 'collect-36kr.js'));
   run(path.join(__dirname, 'collect-articles.js'));
 
   // 4. 快照

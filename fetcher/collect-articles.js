@@ -3,7 +3,9 @@
  * ------------------------------------------------------------
  * 数据源：
  *   1. ClawHunt 官方文章（黑客松主办方的一线动态，静态页可直接解析）
- *   2. RSS 源（InfoQ / 人人都是产品经理 / 少数派 / 机器之心）
+ *   2. 36氪 科技/AI 频道（反爬，由 collect-36kr.js 用浏览器采集后读取）
+ *   3. 公众号文章（复用活动库里已抓到的公众号全文）
+ *   4. RSS 源（InfoQ / 人人都是产品经理 / 少数派 / 量子位 / 爱范儿 / 雷峰网 / 极客公园）
  *
  * 输出 data/articles.json：
  *   { updatedAt, articles: [{ id,title,excerpt,url,source,category,date,minutes,image }] }
@@ -202,6 +204,19 @@ function parseWechatEvents() {
   return out;
 }
 
+/**
+ * 36氪：由 collect-36kr.js 用浏览器采集（纯 HTTP 会被反爬拦截），
+ * 这里只读取其结果文件，保证两条链路的产出在同一份 articles.json 里
+ */
+function parse36kr() {
+  const p = path.join(ROOT, 'data', 'browser-out', '36kr.json');
+  if (!fs.existsSync(p)) return [];
+  try {
+    const d = JSON.parse(fs.readFileSync(p, 'utf8'));
+    return d.articles || [];
+  } catch { return []; }
+}
+
 /* ---------------- 主流程 ---------------- */
 
 async function main() {
@@ -209,6 +224,7 @@ async function main() {
   const jobs = [
     { name: 'ClawHunt', run: async () => parseClawhunt(await httpGet(CLAWHUNT_URL)) },
     { name: '公众号(活动库)', run: async () => parseWechatEvents() },
+    { name: '36氪', run: async () => parse36kr() },
   ]
     .concat(SOURCES.filter((s) => s.type === 'rss').map((s) => ({
       name: s.name,
@@ -239,11 +255,54 @@ async function main() {
     return true;
   });
   uniq.sort((a, b) => String(b.date).localeCompare(String(a.date)));
-  // 截断时优先保留带全文的（公众号 / ClawHunt 可站内阅读），
-  // 否则它们会因日期较早被纯链接的 RSS 条目挤出去
-  const withBody = uniq.filter((a) => a.content && a.content.length > 200);
-  const rest = uniq.filter((a) => !(a.content && a.content.length > 200));
-  const articles = withBody.concat(rest).slice(0, 120);
+  // 按来源配额挑文：36氪 这类高产源一次能来 100+ 篇，纯按日期截断会把
+  // 公众号/少数派等小源整体挤掉，导致来源失衡。这里每个来源先保 12 篇，
+  // 剩余名额再按日期把余下的补齐。
+  const PER_SOURCE = 20;
+  const LIMIT = 120;
+  // 36氪 的子来源写作「36氪 · 新智元」，若按完整 source 分组会产生几十个"来源"，
+  // 配额形同虚设；分组时统一归到主来源（按 · 前一段）
+  const rootSource = (s) => String(s || '其他').split('·')[0].trim() || '其他';
+  const bySource = new Map();
+  for (const a of uniq) {
+    const k = rootSource(a.source);
+    if (!bySource.has(k)) bySource.set(k, []);
+    bySource.get(k).push(a);
+  }
+  const picked = new Set();
+  const round1 = [];
+  // 先无条件保留"可站内阅读"的源：ClawHunt（正文稍后抓）与公众号（活动库已带全文）。
+  // 它们的日期往往偏早，若参与统一截断会被 36氪 这类当天新文整体挤掉。
+  const BODY_SOURCES = new Set(['ClawHunt', '公众号']);
+  const bodyFirst = uniq.filter((a) =>
+    (a.content && a.content.length > 200) || BODY_SOURCES.has(rootSource(a.source)));
+  for (const a of bodyFirst) { round1.push(a); picked.add(a); }
+  // 站内可读的已经吃掉一部分额度，剩余额度按来源配额分配，
+  // 避免 round1 超出 LIMIT 后被 slice 从尾部（日期较早的）整段砍掉
+  const quota = new Map();
+  for (const [, list] of bySource) {
+    const remain = list.filter((a) => !picked.has(a));
+    quota.set(list, remain.slice(0, PER_SOURCE));
+  }
+  // 按日期从新到旧填满剩余额度
+  const pool = [];
+  for (const [, q] of quota) pool.push(...q);
+  pool.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  for (const a of pool) {
+    if (round1.length >= LIMIT) break;
+    round1.push(a); picked.add(a);
+  }
+  round1.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  const rest = uniq.filter((a) => !picked.has(a));
+  const articles = round1.concat(rest).slice(0, LIMIT);
+  console.log(`  · 来源 ${bySource.size} 个，站内可读 ${bodyFirst.length} 篇，总量 ${articles.length} 篇`);
+
+  // 最终排序：资讯类（36氪/RSS 等外部文章源）按日期在前，
+  // 公众号/ClawHunt 多为活动报名长文，放后面，避免首屏全是报名帖
+  const NEWS_SOURCES = new Set(['36氪', 'InfoQ 中国', '少数派', '爱范儿', '雷峰网',
+    '人人都是产品经理', '量子位', '机器之心 · Synced']);
+  const rank = (a) => (NEWS_SOURCES.has(rootSource(a.source)) ? 0 : 1);
+  articles.sort((a, b) => rank(a) - rank(b) || String(b.date).localeCompare(String(a.date)));
 
   // ClawHunt 文章静态可解析 → 直接抓全文存 content（站内阅读器用）
   const clawhunt = articles.filter((a) => a.source === 'ClawHunt');

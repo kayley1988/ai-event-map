@@ -1632,6 +1632,12 @@ a { color: inherit; }
   font-size: 11px;
 }
 .art-src { color: var(--ink-2); }
+/* 转载源（如 36氪 转载自某公众号）：弱化显示，避免和主来源抢注意力 */
+.art-byline {
+  color: var(--ink-3);
+  font-size: .92em;
+}
+.art-byline::before { content: '转自 '; opacity: .7; }
 .art-title {
   margin: 6px 0 4px;
   font-size: 16.5px;

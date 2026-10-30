@@ -285,6 +285,7 @@
           <div class="art-meta">
             <span class="badge badge-art">${esc(a.category)}</span>
             <span class="art-src">${esc(a.source)}</span>
+            ${a.byline ? `<span class="art-byline">${esc(a.byline)}</span>` : ''}
             ${a.minutes ? `<span>约 ${a.minutes} 分钟</span>` : ''}
             ${a.date ? `<span>${esc(a.date)}</span>` : ''}
             ${a.content ? '<span class="art-readable">📖 站内可读</span>' : ''}

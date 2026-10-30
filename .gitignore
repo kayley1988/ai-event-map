@@ -12,3 +12,9 @@ shots/
 node_modules/
 dist/
 .DS_Store
+opc-raw.json
+probe_opc.js
+verify_local.js
+*-map.png
+*-cal.png
+*-articles.png

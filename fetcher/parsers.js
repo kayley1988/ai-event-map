@@ -18,7 +18,7 @@ const CITY_LIST = [
   '包头', '赤峰', '呼和浩特', '银川', '西宁', '拉萨', '乌鲁木齐', '珠海',
   '前海', '横琴', '雄安', '浦东', '临港', '张江', '漕河泾', '中关村',
   '望京', '亦庄', '西二旗', '未来科技城', '南山', '坂田', '天河北', '琶洲',
-  '珠江新城', '科学城', '高新区', '软件园', '五角场', '海��',
+  '珠江新城', '科学城', '高新区', '软件园', '五角场', '海淀',
 ];
 
 const CITY_ALIAS = {
@@ -62,6 +62,29 @@ function detectCity(text) {
   const sorted = [...CITY_LIST].sort((a, b) => b.length - a.length);
   for (const c of sorted) {
     if (t.includes(c)) return c;
+  }
+  return null;
+}
+
+/**
+ * 取「日期紧跟括号城市」的城市：形如「2026.12.10 ( 上海)」。
+ * 多城巡展（北上广三地）常写成「时间:2026.12.10 ( 上海)2026.12.4(广州)」，
+ * 此时按别名猜城市会落到第一座城，与日期对不上。日期后紧跟的括号城市更可靠。
+ */
+function detectCityNearDate(text) {
+  if (!text) return null;
+  const t = String(text);
+  const sorted = [...CITY_LIST].sort((a, b) => b.length - a.length);
+  // 日期 → ( 城市)
+  const m = t.match(/(?:20\d{2}[-/.年]\s*\d{1,2}[-/.月]\s*\d{1,2}|\d{1,2}\s*月\s*\d{1,2}\s*日)[^()（）]{0,12}[（(]\s*([^()（）]{2,8}?)\s*[）)]/);
+  if (m) {
+    const inner = m[1];
+    for (const c of sorted) {
+      if (inner.includes(c)) return c;
+    }
+    for (const [k, v] of Object.entries(CITY_NORMALIZE)) {
+      if (inner.includes(k)) return v;
+    }
   }
   return null;
 }
@@ -251,7 +274,31 @@ const TITLE_NOISE_FRAGMENTS = [
   /\s*[,，]\s*火热报名中/g,
   // "等4项活动正在报名中!" 这类尾巴
   /\s*等?\s*\d+\s*项活动正在\s*报名\s*中?\s*[!！]?$/g,
+  // 活动行轮播图的 UI 提示文字
+  /[（(]\s*右滑[^）)]{0,20}[）)]/g,
+  /[（(]\s*点击[^）)]{0,20}[）)]/g,
 ];
+
+/**
+ * SEO 堆砌尾巴：标题被「主标题：副标题：一堆关键词」结构污染，
+ * 冒号后的关键词段不含任何活动形态词（大会/沙龙/黑客松…），属于 SEO 尾巴。
+ */
+const TITLE_FORM_WORDS = /黑客松|hackathon|大会|峰会|论坛|沙龙|meetup|开发者日|训练营|工作坊|路演|大赛|比赛|活动|聚会|营|展|发布/i;
+
+function trimSeoTail(title) {
+  const parts = String(title).split('：');
+  if (parts.length < 3) return title;
+  // 保留到最后一个含活动形态词的分段为止
+  let keep = 0;
+  for (let i = 0; i < parts.length; i++) {
+    if (TITLE_FORM_WORDS.test(parts[i])) keep = i;
+  }
+  if (keep >= parts.length - 1) return title;
+  const kept = parts.slice(0, keep + 1).join('：').trim();
+  // 截断后过短则保留原标题，避免把有效标题清空
+  if (kept.replace(/[^\u4e00-\u9fa5a-z0-9]/gi, '').length < 8) return title;
+  return kept;
+}
 
 const PAST_NOISE = [
   '圆满举办', '圆满结束', '成功举办', '顺利举办', '圆满落幕', '精彩回顾',
@@ -281,6 +328,7 @@ function cleanTitle(raw) {
        .trim();
   t = t.replace(/\s+/g, ' ').trim();
   t = t.replace(/[,，]\s*$/, '').trim();
+  t = trimSeoTail(t);
   if (t.length > 60) t = t.slice(0, 60).replace(/[\s，,、。.|｜\-]+$/, '');
   return t;
 }
@@ -317,6 +365,48 @@ function isPastEvent(title, desc) {
 
 function slug(title) {
   return String(title).toLowerCase().replace(/[^\w\u4e00-\u9fa5]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+}
+
+/**
+ * 标题归一化核心串：去掉标点、空白与数字（数字多是日期/届次等易变后缀）
+ * 用于判断两条记录是否指向同一个活动
+ */
+function titleCore(title) {
+  return String(title || '')
+    .replace(/[·・\s,，。、|｜\-—:：!！?？"'“”‘’()（）【】\[\]<>《》]/g, '')
+    .replace(/\d+/g, '')
+    .toLowerCase();
+}
+
+/**
+ * 同一活动的两个标题常常只在尾部不同
+ *（如「北京这场国际 AI黑客松」与「北京这场国际 AI 黑客松,10月25日 报名 截止」）。
+ * 用「归一化后互为前缀 + 短者足够长」判断为重复，避免漏过去重。
+ */
+function isSameTitle(a, b) {
+  const x = titleCore(a);
+  const y = titleCore(b);
+  if (!x || !y) return false;
+  if (x === y) return true;
+  const [short, long] = x.length <= y.length ? [x, y] : [y, x];
+  if (short.length < 8) return false;
+  return long.startsWith(short);
+}
+
+/**
+ * 「汇总页 / 合集页 / 导航页」识别：
+ * 这些是站点的赛事列表页，不是单个活动。它们的城市与日期来自页面里的
+ * 其它条目，会在地图上产生错误落点，属于噪声。
+ */
+const LISTING_NOISE = [
+  /赛事汇总|主题合集|赛事合集|正在报名与截止时间/,
+  /(汇总|合集|合辑|盘点|榜单|导航|入口)\s*[（(【\[]/,
+  /(汇总|合集|合辑|盘点|榜单|导航)\s*$/,
+];
+
+function isListingPage(title) {
+  const t = String(title || '');
+  return LISTING_NOISE.some((re) => re.test(t));
 }
 
 /* ---------------- 详情富化 ---------------- */
@@ -406,8 +496,9 @@ function buildSummary(ev) {
 
 module.exports = {
   CITY_LIST, CITY_NORMALIZE, CITY_ALIAS,
-  detectCity, parseDate, detectVenue, detectAudience, isRealVenue,
+  detectCity, detectCityNearDate, parseDate, detectVenue, detectAudience, isRealVenue,
   detectType, cleanTitle, refineTitle, isPastEvent, slug, iso,
+  titleCore, isSameTitle, isListingPage,
   PAST_NOISE, OLD_YEAR_RE,
   extractHighlights, buildSummary,
 };

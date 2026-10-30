@@ -15,7 +15,7 @@ const zlib = require('zlib');
 const crypto = require('crypto');
 const { SOURCES, EVENT_KEYWORDS, NOISE_KEYWORDS } = require('./sources');
 const P = require('./parsers');
-const { detectCity, parseDate, detectVenue, detectAudience, detectType, refineTitle, isPastEvent, slug, OLD_YEAR_RE, extractHighlights, buildSummary, isRealVenue } = P;
+const { detectCity, detectCityNearDate, parseDate, detectVenue, detectAudience, detectType, refineTitle, isPastEvent, slug, OLD_YEAR_RE, extractHighlights, buildSummary, isRealVenue, isSameTitle, isListingPage } = P;
 
 const ROOT = path.resolve(__dirname, '..');
 const DATA_DIR = path.join(ROOT, 'data');
@@ -344,12 +344,16 @@ function buildEvent(it) {
   if (title.replace(/[^\u4e00-\u9fa5a-z0-9]/gi, '').length < 6) return null;
   // 站点名/导航项不是活动
   if (/AI\s*Competition\s*Radar|全球\s*AI\s*活动\s*地图|一站汇总正在报名/i.test(it.title)) return null;
+  // 汇总页/合集页/导航页不是单个活动
+  if (isListingPage(it.title)) return null;
 
   // 日期优先取自摘要（更精准），正文兜底
   let dateInfo = parseDate(it.desc) || parseDate(it.title);
   if (!dateInfo) dateInfo = parseDate(it.detail || '');
   // 城市同理
-  let city = detectCity(`${it.desc} ${it.title}`);
+  // 优先取「日期后紧跟括号城市」，避免多城巡展被别名映射到第一座城
+  let city = detectCityNearDate(`${it.desc} ${it.detail || ''}`);
+  if (!city) city = detectCity(`${it.desc} ${it.title}`);
   if (!city) city = detectCity(it.detail || '');
 
   if (!city) return null;
@@ -453,13 +457,14 @@ async function main() {
   }
   console.log(`  解析出结构化活动 ${events.length} 条`);
 
-  // 3. 去重（同名 + 同城市 + 同日）
-  const seen = new Map();
+  // 3. 去重（同城市 + 同日 + 标题归一化后互为前缀视为同一活动）
+  const seen = [];
   for (const ev of events) {
-    const key = `${ev.city}|${ev.title.replace(/[·・\s]/g, '').slice(0, 16)}|${ev.dateStart}`;
-    if (!seen.has(key)) seen.set(key, ev);
+    const dup = seen.find((s) =>
+      s.city === ev.city && s.dateStart === ev.dateStart && isSameTitle(s.title, ev.title));
+    if (!dup) seen.push(ev);
   }
-  const fresh = [...seen.values()];
+  const fresh = seen;
   console.log(`  去重后 ${fresh.length} 条`);
 
   // 4. 与种子数据合并（种子优先保留，避免抓取覆盖高质量人工数据）
@@ -468,11 +473,12 @@ async function main() {
     try { seed = JSON.parse(fs.readFileSync(SEED_FILE, 'utf8')); } catch (e) { /* ignore */ }
   }
   const seedIds = new Set((seed.events || []).map((e) => e.id));
-  const seedKeys = new Set((seed.events || []).map((e) => `${e.city}|${e.title.replace(/[·・\s]/g, '').slice(0, 16)}|${e.dateStart}`));
   const merged = [...(seed.events || [])];
   for (const ev of fresh) {
-    const key = `${ev.city}|${ev.title.replace(/[·・\s]/g, '').slice(0, 16)}|${ev.dateStart}`;
-    if (!seedIds.has(ev.id) && !seedKeys.has(key)) merged.push(ev);
+    if (seedIds.has(ev.id)) continue;
+    // 与种子条目标题重复（同一活动）也跳过
+    if (merged.some((m) => m.city === ev.city && m.dateStart === ev.dateStart && isSameTitle(m.title, ev.title))) continue;
+    merged.push(ev);
   }
 
   // 5. 排序

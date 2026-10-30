@@ -11,6 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
+const { parseDate } = require('./parsers');
 
 const ROOT = path.resolve(__dirname, '..');
 const DATA = path.join(ROOT, 'data', 'events.json');
@@ -131,6 +132,26 @@ async function main() {
 
       if (t.length >= 120) {
         e.content = t.slice(0, 3000);
+        // 正文里的完整日期（如「时间 2024/01/29」）比列表页推断的日期更权威。
+        // 列表页只有「01月29日」没有年份时，parseDate 会按「下一次出现」推算，
+        // 可能把早已结束的老活动推到 2027 年。以正文日期为准并剔除已过期条目。
+        const real = parseDate(t);
+        if (real) {
+          const rs = typeof real === 'string' ? real : real.start;
+          const re = typeof real === 'string' ? '' : (real.end || '');
+          if (rs && rs !== e.dateStart) {
+            const past = new Date(rs + 'T00:00:00+08:00') < new Date(Date.now() - 864e5);
+            if (past) {
+              e.stale = true;
+              console.log(`  ✗ 正文日期 ${rs} 已过期｜${e.title.slice(0, 26)}`);
+            } else {
+              console.log(`  ↻ 日期修正 ${e.dateStart} → ${rs}｜${e.title.slice(0, 22)}`);
+              e.dateStart = rs;
+              e.dateEnd = re;
+              e.id = `${e.id.replace(/-\d{4}-\d{2}-\d{2}$/, '')}-${rs}`;
+            }
+          }
+        }
         ok++;
         console.log(`  ✓ ${e.content.length} 字｜${e.title.slice(0, 26)}`);
       } else {

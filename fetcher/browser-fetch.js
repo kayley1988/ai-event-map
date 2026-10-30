@@ -145,7 +145,8 @@ const PLATFORM_CONF = {
         out.push({
           title,
           author: host,
-          url: '',
+          // 活动详情页链接（搜索结果卡片内的 a[href*="/event/"]），去掉 utm 跟踪参数
+          url: (e.querySelector('a[href*="/event/"]')?.href || '').split('?')[0],
           desc: [dateLine, region, host].filter(Boolean).join(' | '),
           city: region,
           dateText: dateLine,

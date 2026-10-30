@@ -148,7 +148,34 @@ function main() {
 
   // 4. 快照
   buildSnapshot();
+
+  // 5. 静态资源指纹：把 index.html 里的 ?v=xxx 更新为资源内容哈希
+  //    否则 GitHub Pages 的 max-age=600 会让浏览器继续用旧 app.js，
+  //    旧 JS 解析新数据时可能渲染异常（例如资讯页空白）
+  stampAssets();
+
   console.log('\n════ 更新完成 ════');
+}
+
+/** 计算 assets 下 css/js 的内容哈希，回写 index.html 的 ?v= 参数 */
+function stampAssets() {
+  const crypto = require('crypto');
+  const htmlPath = path.join(ROOT, 'index.html');
+  if (!fs.existsSync(htmlPath)) return;
+  let html = fs.readFileSync(htmlPath, 'utf8');
+  let touched = 0;
+  for (const rel of ['assets/style.css', 'assets/app.js']) {
+    const abs = path.join(ROOT, rel);
+    if (!fs.existsSync(abs)) continue;
+    const hash = crypto.createHash('md5').update(fs.readFileSync(abs)).digest('hex').slice(0, 8);
+    const re = new RegExp(`${rel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\?v=[a-f0-9]{8})?`, 'g');
+    const next = html.replace(re, `${rel}?v=${hash}`);
+    if (next !== html) { html = next; touched++; }
+  }
+  if (touched) {
+    fs.writeFileSync(htmlPath, html);
+    console.log(`\n$ stamp assets: ${touched} 个资源指纹已更新`);
+  }
 }
 
 main();
